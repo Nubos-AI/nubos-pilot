@@ -1,0 +1,30 @@
+{
+  "name": "nubos-pilot",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0"
+  },
+  "bin": {
+    "nubos-pilot": "bin/install.js"
+  },
+  "files": [
+    "bin/install.js",
+    "bin/np-tools/",
+    "lib/install/",
+    "lib/askuser.cjs",
+    "lib/next.cjs",
+    "lib/progress.cjs",
+    "lib/runtime/",
+    "templates/",
+    "workflows/"
+  ],
+  "scripts": {
+    "test": "node --test 'lib/**/*.test.cjs' 'tests/**/*.test.cjs' 'bin/**/*.test.cjs'",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='lib/**' 'lib/**/*.test.cjs' 'tests/**/*.test.cjs' 'bin/**/*.test.cjs'",
+    "check-coverage": "node bin/check-coverage.cjs",
+    "ci": "npm run test && npm run check-coverage"
+  }
+}

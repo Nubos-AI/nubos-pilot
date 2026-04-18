@@ -1,0 +1,51 @@
+{
+  "phase": 5,
+  "padded": "05",
+  "mode": "power",
+  "created": "2026-04-15T00:00:00Z",
+  "questions": [
+    {
+      "id": "Q-01",
+      "area": "domain",
+      "question": "What is the phase boundary?",
+      "answer": "Ship the power-mode file-UI layer in JSON-only form (D-05..D-08).",
+      "explain": null
+    },
+    {
+      "id": "Q-02",
+      "area": "decisions",
+      "question": "Main implementation decision?",
+      "answer": "No HTML companion; QUESTIONS.json is authoritative until finalize.",
+      "explain": null
+    },
+    {
+      "id": "Q-03",
+      "area": "canonical_refs",
+      "question": "Which prior references must hold?",
+      "answer": "Phase 2 core.cjs (atomicWriteFileSync, withFileLock), Phase 3 template.cjs render.",
+      "explain": null
+    },
+    {
+      "id": "Q-04",
+      "area": "code_context",
+      "question": "Which existing assets are reused?",
+      "answer": "lib/template.cjs loadTemplate, lib/core.cjs atomicWriteFileSync.",
+      "explain": null
+    },
+    {
+      "id": "Q-05",
+      "area": "specifics",
+      "question": "User-specific expectations?",
+      "answer": "Edit QUESTIONS.json in any editor (VS Code, vim, JetBrains).",
+      "explain": null
+    },
+    {
+      "id": "Q-06",
+      "area": "deferred",
+      "question": "What is out of scope?",
+      "answer": "HTML companion UI is deferred indefinitely.",
+      "explain": null
+    }
+  ],
+  "answers_status": "pending"
+}
