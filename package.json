@@ -1,6 +1,16 @@
 {
   "name": "nubos-pilot",
-  "private": true,
+  "version": "0.1.0",
+  "description": "AI-driven planning and execution tool for code projects",
+  "homepage": "https://github.com/Nubos-AI/nubos-pilot",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nubos-AI/nubos-pilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Nubos-AI/nubos-pilot/issues"
+  },
+  "license": "MIT",
   "engines": {
     "node": ">=22"
   },
@@ -11,15 +21,14 @@
     "nubos-pilot": "bin/install.js"
   },
   "files": [
-    "bin/install.js",
-    "bin/np-tools/",
-    "lib/install/",
-    "lib/askuser.cjs",
-    "lib/next.cjs",
-    "lib/progress.cjs",
-    "lib/runtime/",
+    "bin/",
+    "lib/",
     "templates/",
-    "workflows/"
+    "workflows/",
+    "agents/",
+    "docs/",
+    "np-tools.cjs",
+    "README.md"
   ],
   "scripts": {
     "test": "node --test 'lib/**/*.test.cjs' 'tests/**/*.test.cjs' 'bin/**/*.test.cjs'",

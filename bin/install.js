@@ -26,21 +26,79 @@ const OPENCODE_MANIFEST_PREFIX = '.opencode/nubos-pilot/';
 const SOURCE_OPENCODE_DIR = path.join(__dirname, '..', 'templates', 'opencode', 'payload');
 const OPENCODE_JSON_TEMPLATE = path.join(__dirname, '..', 'templates', 'opencode', 'opencode.json');
 
+function _autoAskUser(spec) {
+  return Promise.resolve({
+    value: spec && spec.default !== undefined ? spec.default : null,
+    source: 'auto',
+  });
+}
+
 const MANAGED_BLOCK_INNER =
   'This project uses [nubos-pilot](https://github.com/nubos/nubos-pilot)'
   + ' for planning and execution.\n\nRun `npx nubos-pilot doctor`'
   + ' to check install integrity.';
 
-function _payloadDirFor(projectRoot) {
+const VALID_AGENTS = ['claude', 'codex', 'gemini', 'opencode'];
+const VALID_SCOPES = ['local', 'global'];
+
+function parseInstallFlags(args) {
+  const flags = { agent: null, scope: null, mcp: false, yes: false };
+  const rest = [];
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--agent' || a === '-a') { flags.agent = args[++i] || null; continue; }
+    if (a.startsWith('--agent=')) { flags.agent = a.slice('--agent='.length); continue; }
+    if (a === '--scope' || a === '-s') { flags.scope = args[++i] || null; continue; }
+    if (a.startsWith('--scope=')) { flags.scope = a.slice('--scope='.length); continue; }
+    if (a === '--mcp') { flags.mcp = true; continue; }
+    if (a === '--yes' || a === '-y') { flags.yes = true; continue; }
+    rest.push(a);
+  }
+  if (flags.agent !== null && !VALID_AGENTS.includes(flags.agent)) {
+    throw new NubosPilotError('invalid-flag',
+      '--agent must be one of: ' + VALID_AGENTS.join(', '),
+      { flag: '--agent', got: flags.agent });
+  }
+  if (flags.scope !== null && !VALID_SCOPES.includes(flags.scope)) {
+    throw new NubosPilotError('invalid-flag',
+      '--scope must be one of: ' + VALID_SCOPES.join(', '),
+      { flag: '--scope', got: flags.scope });
+  }
+  return { flags, rest };
+}
+
+function _payloadDirFor(projectRoot, scope) {
+  if (scope === 'global') return path.join(os.homedir(), '.claude', 'nubos-pilot');
   return path.join(projectRoot, PAYLOAD_SUBPATH);
+}
+
+function _opencodePayloadDirFor(projectRoot, scope) {
+  if (scope === 'global') return path.join(os.homedir(), '.config', 'opencode', 'nubos-pilot');
+  return path.join(projectRoot, OPENCODE_SUBPATH);
+}
+
+function _opencodeManifestPrefix(scope) {
+  return scope === 'global'
+    ? '~/.config/opencode/nubos-pilot/'
+    : OPENCODE_MANIFEST_PREFIX;
 }
 
 function _stateDirFor(projectRoot) {
   return path.join(projectRoot, STATE_SUBPATH);
 }
 
-function detectMode(projectRoot) {
-  const payloadDir = _payloadDirFor(projectRoot);
+function _readExistingScope(projectRoot) {
+  const cfgPath = path.join(_stateDirFor(projectRoot), 'config.json');
+  if (!fs.existsSync(cfgPath)) return null;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    return cfg && cfg.scope ? cfg.scope : null;
+  } catch { return null; }
+}
+
+function detectMode(projectRoot, scope) {
+  const s = scope || _readExistingScope(projectRoot) || 'local';
+  const payloadDir = _payloadDirFor(projectRoot, s);
   return manifestMod.readManifest(payloadDir) ? 're-install' : 'init';
 }
 
@@ -65,9 +123,12 @@ function _copyTree(src, dst) {
   }
 }
 
-async function _runInitQuestions(detectedRuntime, askUser) {
-  const runtime = (await askUser({ type: 'select', question: 'Welche Runtime nutzt du?',
-    options: ['claude', 'codex', 'gemini', 'opencode'], default: detectedRuntime || 'claude' })).value;
+async function _runInitQuestions(detectedRuntime, askUser, flags) {
+  const f = flags || {};
+  const runtime = f.agent || (await askUser({ type: 'select', question: 'Welche Runtime nutzt du?',
+    options: VALID_AGENTS, default: detectedRuntime || 'claude' })).value;
+  const scope = f.scope || (await askUser({ type: 'select', question: 'Installation scope?',
+    options: VALID_SCOPES, default: 'local' })).value;
   const model_profile = (await askUser({ type: 'select', question: 'Model-Profile?',
     options: ['inherit', 'quality', 'balanced', 'budget'], default: 'inherit' })).value;
   const commit_docs = (await askUser({ type: 'confirm', question: 'Commit documentation artefacts?', default: true })).value;
@@ -80,7 +141,7 @@ async function _runInitQuestions(detectedRuntime, askUser) {
   const plan_checker = (await askUser({ type: 'confirm', question: 'Enable plan_checker?', default: true })).value;
   const verifier = (await askUser({ type: 'confirm', question: 'Enable verifier?', default: true })).value;
   const response_language = (await askUser({ type: 'input', question: 'Response language (ISO-639 code)?', default: 'en' })).value;
-  return { runtime, model_profile, commit_docs, branching_strategy, phase_branch_template,
+  return { runtime, scope, mcp: !!f.mcp, model_profile, commit_docs, branching_strategy, phase_branch_template,
     milestone_branch_template, parallelization, research, plan_checker, verifier, response_language };
 }
 
@@ -133,41 +194,55 @@ function _rewriteManagedMarkdown(projectRoot) {
 async function runInstall(opts) {
   const o = opts || {};
   const projectRoot = o.projectRoot || o.cwd || process.cwd();
-  const mode = o.mode || detectMode(projectRoot);
+  const flags = o.flags || {};
+  const mode = o.mode || detectMode(projectRoot, flags.scope);
   const dryRun = !!o.dryRun;
-  const askUser = o.askUser || defaultAskUser;
+  const askUser = flags.yes ? _autoAskUser : (o.askUser || defaultAskUser);
   const sourceDir = o.sourceDir || SOURCE_PAYLOAD_DIR;
   const stateDir = _stateDirFor(projectRoot);
   fs.mkdirSync(stateDir, { recursive: true });
   return withFileLock(path.join(stateDir, '.install.lock'),
-    () => _runInstallLocked({ projectRoot, mode, dryRun, askUser, sourceDir, stateDir }),
+    () => _runInstallLocked({ projectRoot, mode, dryRun, askUser, sourceDir, stateDir, flags }),
     { timeoutMs: 60000 });
 }
 
 async function _runInstallLocked(ctx) {
-  const { projectRoot, mode, dryRun, askUser, sourceDir, stateDir } = ctx;
+  const { projectRoot, mode, dryRun, askUser, sourceDir, stateDir, flags } = ctx;
   console.error(cyan + '→ nubos-pilot install (mode=' + mode + ')' + reset);
-  stagingMod.cleanStaleStaging(projectRoot);
 
+  const preliminaryScope = (flags && flags.scope) || _readExistingScope(projectRoot) || 'local';
+  const preliminaryBase = preliminaryScope === 'global' ? os.homedir() : projectRoot;
+  stagingMod.cleanStaleStaging(preliminaryBase);
+
+  let initConfig = null;
   if (mode === 'init') {
     const det = runtimeDetectMod.detectRuntime({ cwd: projectRoot });
-    const config = await _runInitQuestions(det && det.runtime, askUser);
-    config.runtime = det && det.runtime ? det.runtime : 'codex';
-    config.runtime_source = det && det.source ? det.source : 'asked';
+    const config = await _runInitQuestions(det && det.runtime, askUser, flags);
+    if (flags && flags.agent) {
+      config.runtime = flags.agent;
+      config.runtime_source = 'flag';
+    } else {
+      config.runtime = det && det.runtime ? det.runtime : config.runtime || 'codex';
+      config.runtime_source = det && det.source ? det.source : 'asked';
+    }
     const configPath = path.join(stateDir, 'config.json');
     if (!dryRun) atomicWriteFileSync(configPath, JSON.stringify(config, null, 2));
     else console.error(dim + 'DRY-RUN: würde schreiben ' + configPath + reset);
+    initConfig = config;
   }
 
-  const payloadDir = _payloadDirFor(projectRoot);
+  const resolvedScope = (initConfig && initConfig.scope) || preliminaryScope;
+  const payloadBase = resolvedScope === 'global' ? os.homedir() : projectRoot;
+  const payloadDir = _payloadDirFor(projectRoot, resolvedScope);
   const oldManifest = manifestMod.readManifest(payloadDir);
-  const tmp = stagingMod.stageDir(projectRoot);
+  const tmp = stagingMod.stageDir(payloadBase);
   _copyTree(sourceDir, tmp);
   let pkgVersion = '0.0.0';
   try { pkgVersion = String(require('../package.json').version || '0.0.0'); } catch {}
   const newManifest = manifestMod.buildManifest(tmp, pkgVersion);
 
-  const opencodeTarget = path.join(projectRoot, OPENCODE_SUBPATH);
+  const opencodeTarget = _opencodePayloadDirFor(projectRoot, resolvedScope);
+  const opencodeManifestPrefix = _opencodeManifestPrefix(resolvedScope);
   const opencodeTmp = path.join(stateDir, '.opencode.tmp');
   try { fs.rmSync(opencodeTmp, { recursive: true, force: true }); } catch {}
   try {
@@ -180,7 +255,7 @@ async function _runInstallLocked(ctx) {
         throw new NubosPilotError('manifest-path-traversal',
           'Opencode payload contains suspicious path', { rel });
       }
-      newManifest.files[OPENCODE_MANIFEST_PREFIX + rel] = opencodeManifest.files[rel];
+      newManifest.files[opencodeManifestPrefix + rel] = opencodeManifest.files[rel];
     }
   }
   const diff = manifestMod.diffManifests(oldManifest, newManifest);
@@ -206,24 +281,25 @@ async function _runInstallLocked(ctx) {
 
   if (dryRun) {
     const summary = { mode, dryRun: true,
+      scope: resolvedScope,
       wouldWrite: Object.keys(newManifest.files).length,
       wouldBackup: backupLog.length, wouldDelete: diff.stale.length,
       wouldWriteGemini: true,
       wouldWriteOpencodeJson: !fs.existsSync(path.join(projectRoot, 'opencode.json')),
       stale: diff.stale, changed: diff.changed, added: diff.added };
     process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
-    try { stagingMod.cleanStaleStaging(projectRoot); } catch {}
+    try { stagingMod.cleanStaleStaging(payloadBase); } catch {}
     try { fs.rmSync(opencodeTmp, { recursive: true, force: true }); } catch {}
     return summary;
   }
 
   if (fs.existsSync(payloadDir) && fs.lstatSync(payloadDir).isSymbolicLink()) {
-    try { stagingMod.cleanStaleStaging(projectRoot); } catch {}
+    try { stagingMod.cleanStaleStaging(payloadBase); } catch {}
     throw new NubosPilotError('target-is-symlink',
       'Refusing to swap into a symlink target: ' + payloadDir, { payloadDir });
   }
 
-  stagingMod.finalizeSwap(projectRoot);
+  stagingMod.finalizeSwap(payloadBase);
   for (const rel of diff.stale) {
     try { fs.unlinkSync(path.join(payloadDir, rel)); } catch {}
   }
@@ -248,15 +324,32 @@ async function _runInstallLocked(ctx) {
     fs.mkdirSync(opencodeParent, { recursive: true });
     fs.renameSync(opencodeTmp, opencodeTarget);
     try { fs.rmSync(opencodeBak, { recursive: true, force: true }); } catch {}
+    const opencodeBase = resolvedScope === 'global' ? os.homedir() : projectRoot;
     for (const rel of diff.stale) {
-      if (rel.startsWith(OPENCODE_MANIFEST_PREFIX)) {
-        const stalePath = path.join(projectRoot, rel);
-        try { fs.unlinkSync(stalePath); } catch {}
+      if (rel.startsWith(opencodeManifestPrefix)) {
+        const relFs = rel.startsWith('~/')
+          ? path.join(os.homedir(), rel.slice(2))
+          : path.join(opencodeBase, rel);
+        try { fs.unlinkSync(relFs); } catch {}
       }
     }
   }
 
   _rewriteManagedMarkdown(projectRoot);
+
+  if (initConfig && initConfig.mcp && !dryRun) {
+    try {
+      const mcpWriter = require('../lib/install/mcp-writer.cjs');
+      const result = mcpWriter.writeMcpConfig({
+        runtime: initConfig.runtime,
+        scope: initConfig.scope,
+        projectRoot,
+      });
+      console.error(green + '  [mcp] nubos MCP configured → ' + result.path + reset);
+    } catch (err) {
+      console.error(yellow + '  [mcp] skipped: ' + (err && err.message) + reset);
+    }
+  }
 
   const projectOpencodeJson = path.join(projectRoot, 'opencode.json');
   if (!fs.existsSync(projectOpencodeJson) && fs.existsSync(OPENCODE_JSON_TEMPLATE)) {
@@ -288,7 +381,8 @@ async function runUninstall(opts) {
 }
 
 function _runUninstallLocked(projectRoot) {
-  const payloadDir = _payloadDirFor(projectRoot);
+  const scope = _readExistingScope(projectRoot) || 'local';
+  const payloadDir = _payloadDirFor(projectRoot, scope);
   const manifest = manifestMod.readManifest(payloadDir);
   if (!manifest) {
     console.error(dim + 'Keine Installation gefunden' + reset);
@@ -330,12 +424,12 @@ function _runUninstallLocked(projectRoot) {
     }
   }
 
-  
-  const opencodeDir = path.join(projectRoot, OPENCODE_SUBPATH);
+  const opencodeDir = _opencodePayloadDirFor(projectRoot, scope);
   if (fs.existsSync(opencodeDir)) {
     try { fs.rmSync(opencodeDir, { recursive: true, force: true }); } catch {}
   }
-  try { fs.rmdirSync(path.join(projectRoot, '.opencode')); } catch {}
+  const opencodeParent = path.dirname(opencodeDir);
+  try { fs.rmdirSync(opencodeParent); } catch {}
 
   console.error(green + '✓ Uninstall abgeschlossen' + reset);
   let leftovers = [];
@@ -352,21 +446,22 @@ function _runUninstallLocked(projectRoot) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
-  const sub = args[0];
+  const rawArgs = process.argv.slice(2);
+  const { flags, rest } = parseInstallFlags(rawArgs);
+  const sub = rest[0];
   const cwd = process.cwd();
   switch (sub) {
     case undefined:
-      return await runInstall({ cwd, mode: detectMode(cwd) });
+      return await runInstall({ cwd, mode: detectMode(cwd), flags });
     case '--dry-run':
-      return await runInstall({ cwd, mode: detectMode(cwd), dryRun: true });
+      return await runInstall({ cwd, mode: detectMode(cwd), dryRun: true, flags });
     case 'update':
-      return await runInstall({ cwd, mode: 'update' });
+      return await runInstall({ cwd, mode: 'update', flags });
     case 'uninstall':
-      return await runUninstall({ cwd, args: args.slice(1) });
+      return await runUninstall({ cwd, args: rest.slice(1) });
     case 'doctor': {
       const doctor = require('./np-tools/doctor.cjs');
-      return await doctor.run(args.slice(1), { cwd, stdout: process.stdout });
+      return await doctor.run(rest.slice(1), { cwd, stdout: process.stdout });
     }
     default:
       process.stderr.write(
@@ -398,6 +493,8 @@ if (require.main === module) {
 
 module.exports = {
   runInstall, runUninstall, detectMode, main,
+  parseInstallFlags,
+  VALID_AGENTS, VALID_SCOPES,
   SOURCE_PAYLOAD_DIR, PAYLOAD_SUBPATH, STATE_SUBPATH,
   _payloadDirFor, _stateDirFor,
 };
