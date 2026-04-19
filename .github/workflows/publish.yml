@@ -27,14 +27,11 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Verify package.json version matches tag
+      - name: Set package.json version from tag
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
-            exit 1
-          fi
+          echo "Setting package.json version to $TAG_VERSION"
+          npm version --no-git-tag-version --allow-same-version "$TAG_VERSION"
 
       - name: Publish to npm
         run: npm publish --access public --provenance
