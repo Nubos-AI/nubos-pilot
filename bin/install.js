@@ -14,9 +14,37 @@ const agentsMdMod = require('../lib/install/agents-md.cjs');
 const codexTomlMod = require('../lib/install/codex-toml.cjs');
 const runtimeDetectMod = require('../lib/install/runtime-detect.cjs');
 const backupMod = require('../lib/install/backup.cjs');
+const registryMod = require('../lib/install/runtimes-registry.cjs');
 
 const cyan = '\x1b[36m', green = '\x1b[32m', yellow = '\x1b[33m',
-      red = '\x1b[31m', dim = '\x1b[2m', reset = '\x1b[0m';
+      red = '\x1b[31m', blue = '\x1b[38;5;33m',
+      dim = '\x1b[2m', bold = '\x1b[1m', reset = '\x1b[0m';
+
+const LOGO = [
+  ' ███╗   ██╗██╗   ██╗██████╗  ██████╗ ███████╗',
+  ' ████╗  ██║██║   ██║██╔══██╗██╔═══██╗██╔════╝',
+  ' ██╔██╗ ██║██║   ██║██████╔╝██║   ██║███████╗',
+  ' ██║╚██╗██║██║   ██║██╔══██╗██║   ██║╚════██║',
+  ' ██║ ╚████║╚██████╔╝██████╔╝╚██████╔╝███████║',
+  ' ╚═╝  ╚═══╝ ╚═════╝ ╚═════╝  ╚═════╝ ╚══════╝',
+];
+
+function _printBanner() {
+  let pkgVersion = '0.0.0';
+  let pkgDesc = '';
+  try {
+    const pkg = require('../package.json');
+    pkgVersion = String(pkg.version || '0.0.0');
+    pkgDesc = String(pkg.description || '');
+  } catch {}
+  process.stderr.write('\n');
+  for (const line of LOGO) process.stderr.write(blue + line + reset + '\n');
+  process.stderr.write('\n');
+  process.stderr.write(' ' + bold + blue + 'Nubos Pilot' + reset
+    + dim + ' v' + pkgVersion + reset + '\n');
+  if (pkgDesc) process.stderr.write(' ' + dim + pkgDesc + reset + '\n');
+  process.stderr.write('\n');
+}
 
 const PAYLOAD_SUBPATH = path.join('.claude', 'nubos-pilot');
 const STATE_SUBPATH = '.nubos-pilot';
@@ -38,16 +66,26 @@ const MANAGED_BLOCK_INNER =
   + ' for planning and execution.\n\nRun `npx nubos-pilot doctor`'
   + ' to check install integrity.';
 
-const VALID_AGENTS = ['claude', 'codex', 'gemini', 'opencode'];
+const VALID_AGENTS = registryMod.listRuntimeIds();
 const VALID_SCOPES = ['local', 'global'];
 
+function _parseAgentsFlag(value) {
+  return String(value || '')
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function parseInstallFlags(args) {
-  const flags = { agent: null, scope: null, mcp: false, yes: false };
+  const flags = { agent: null, agents: null, scope: null, mcp: false, yes: false };
   const rest = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--agent' || a === '-a') { flags.agent = args[++i] || null; continue; }
     if (a.startsWith('--agent=')) { flags.agent = a.slice('--agent='.length); continue; }
+    if (a === '--agents') { flags.agents = _parseAgentsFlag(args[++i]); continue; }
+    if (a.startsWith('--agents=')) { flags.agents = _parseAgentsFlag(a.slice('--agents='.length)); continue; }
+    if (a === '--all') { flags.agents = VALID_AGENTS.slice(); continue; }
     if (a === '--scope' || a === '-s') { flags.scope = args[++i] || null; continue; }
     if (a.startsWith('--scope=')) { flags.scope = a.slice('--scope='.length); continue; }
     if (a === '--mcp') { flags.mcp = true; continue; }
@@ -58,6 +96,21 @@ function parseInstallFlags(args) {
     throw new NubosPilotError('invalid-flag',
       '--agent must be one of: ' + VALID_AGENTS.join(', '),
       { flag: '--agent', got: flags.agent });
+  }
+  if (flags.agents !== null) {
+    for (const a of flags.agents) {
+      if (!VALID_AGENTS.includes(a)) {
+        throw new NubosPilotError('invalid-flag',
+          '--agents values must be one of: ' + VALID_AGENTS.join(', '),
+          { flag: '--agents', got: a });
+      }
+    }
+    if (flags.agents.length === 0) {
+      throw new NubosPilotError('invalid-flag',
+        '--agents requires at least one value',
+        { flag: '--agents' });
+    }
+    if (!flags.agent) flags.agent = flags.agents[0];
   }
   if (flags.scope !== null && !VALID_SCOPES.includes(flags.scope)) {
     throw new NubosPilotError('invalid-flag',
@@ -123,10 +176,34 @@ function _copyTree(src, dst) {
   }
 }
 
+function _runtimeSelectLabels() {
+  return registryMod.RUNTIMES.map((r) => {
+    const home = registryMod.runtimeGlobalDir(r).replace(process.env.HOME || '', '~');
+    return r.label + '  (' + home + ')';
+  });
+}
+
 async function _runInitQuestions(detectedRuntime, askUser, flags) {
   const f = flags || {};
-  const runtime = f.agent || (await askUser({ type: 'select', question: 'Welche Runtime nutzt du?',
-    options: VALID_AGENTS, default: detectedRuntime || 'claude' })).value;
+  let runtimes;
+  if (f.agents && f.agents.length) {
+    runtimes = f.agents.slice();
+  } else if (f.agent) {
+    runtimes = [f.agent];
+  } else {
+    const labels = _runtimeSelectLabels();
+    const picked = (await askUser({ type: 'multiselect',
+      question: yellow + 'Which runtime(s) would you like to install for?' + reset,
+      options: labels, default: [(detectedRuntime || 'claude')] })).value;
+    runtimes = Array.isArray(picked) && picked.length && typeof picked[0] === 'string'
+      && picked[0].includes('(')
+      ? picked.map((label) => {
+          const idx = labels.indexOf(label);
+          return VALID_AGENTS[idx];
+        })
+      : (Array.isArray(picked) ? picked : [picked]);
+  }
+  const runtime = runtimes[0];
   const scope = f.scope || (await askUser({ type: 'select', question: 'Installation scope?',
     options: VALID_SCOPES, default: 'local' })).value;
   const model_profile = (await askUser({ type: 'select', question: 'Model-Profile?',
@@ -141,7 +218,7 @@ async function _runInitQuestions(detectedRuntime, askUser, flags) {
   const plan_checker = (await askUser({ type: 'confirm', question: 'Enable plan_checker?', default: true })).value;
   const verifier = (await askUser({ type: 'confirm', question: 'Enable verifier?', default: true })).value;
   const response_language = (await askUser({ type: 'input', question: 'Response language (ISO-639 code)?', default: 'en' })).value;
-  return { runtime, scope, mcp: !!f.mcp, model_profile, commit_docs, branching_strategy, phase_branch_template,
+  return { runtime, runtimes, scope, mcp: !!f.mcp, model_profile, commit_docs, branching_strategy, phase_branch_template,
     milestone_branch_template, parallelization, research, plan_checker, verifier, response_language };
 }
 
@@ -157,7 +234,9 @@ function _repairCodexConfig() {
   return true;
 }
 
-function _rewriteManagedMarkdown(projectRoot) {
+const LEGACY_AGENTS = new Set(['claude', 'codex', 'gemini', 'opencode']);
+
+function _rewriteManagedMarkdown(projectRoot, runtimes) {
   const claudePath = path.join(projectRoot, 'CLAUDE.md');
   const agentsPath = path.join(projectRoot, 'AGENTS.md');
   const geminiPath = path.join(projectRoot, 'GEMINI.md');
@@ -174,10 +253,12 @@ function _rewriteManagedMarkdown(projectRoot) {
   } else if (claudeExists) {
     agentsBase = agentsMdMod.generateAgentsMd(fs.readFileSync(claudePath, 'utf-8'), 'codex');
   } else {
-    return; 
+    agentsBase = null;
   }
-  const agentsNext = managedBlockMod.rewriteBlock(agentsBase, MANAGED_BLOCK_INNER);
-  atomicWriteFileSync(agentsPath, agentsNext);
+  if (agentsBase !== null) {
+    const agentsNext = managedBlockMod.rewriteBlock(agentsBase, MANAGED_BLOCK_INNER);
+    atomicWriteFileSync(agentsPath, agentsNext);
+  }
 
   let geminiBase;
   if (fs.existsSync(geminiPath)) {
@@ -185,10 +266,30 @@ function _rewriteManagedMarkdown(projectRoot) {
   } else if (claudeExists) {
     geminiBase = agentsMdMod.generateAgentsMd(fs.readFileSync(claudePath, 'utf-8'), 'gemini');
   } else {
-    return;
+    geminiBase = null;
   }
-  const geminiNext = managedBlockMod.rewriteBlock(geminiBase, MANAGED_BLOCK_INNER);
-  atomicWriteFileSync(geminiPath, geminiNext);
+  if (geminiBase !== null) {
+    const geminiNext = managedBlockMod.rewriteBlock(geminiBase, MANAGED_BLOCK_INNER);
+    atomicWriteFileSync(geminiPath, geminiNext);
+  }
+
+  const extras = (runtimes || []).filter((id) => !LEGACY_AGENTS.has(id));
+  for (const id of extras) {
+    const meta = registryMod.getRuntimeMeta(id);
+    if (!meta) continue;
+    const targetPath = registryMod.runtimeAgentsPath(meta, 'local', projectRoot);
+    let base;
+    if (fs.existsSync(targetPath)) {
+      base = fs.readFileSync(targetPath, 'utf-8');
+    } else if (claudeExists) {
+      base = agentsMdMod.generateAgentsMd(fs.readFileSync(claudePath, 'utf-8'), 'codex');
+    } else {
+      base = '';
+    }
+    const next = managedBlockMod.rewriteBlock(base, MANAGED_BLOCK_INNER);
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    atomicWriteFileSync(targetPath, next);
+  }
 }
 
 async function runInstall(opts) {
@@ -208,6 +309,7 @@ async function runInstall(opts) {
 
 async function _runInstallLocked(ctx) {
   const { projectRoot, mode, dryRun, askUser, sourceDir, stateDir, flags } = ctx;
+  _printBanner();
   console.error(cyan + '→ nubos-pilot install (mode=' + mode + ')' + reset);
 
   const preliminaryScope = (flags && flags.scope) || _readExistingScope(projectRoot) || 'local';
@@ -335,7 +437,8 @@ async function _runInstallLocked(ctx) {
     }
   }
 
-  _rewriteManagedMarkdown(projectRoot);
+  const selectedRuntimes = (initConfig && initConfig.runtimes) || (initConfig ? [initConfig.runtime] : []);
+  _rewriteManagedMarkdown(projectRoot, selectedRuntimes);
 
   if (initConfig && initConfig.mcp && !dryRun) {
     try {
@@ -413,8 +516,26 @@ function _runUninstallLocked(projectRoot) {
 
   try { fs.rmdirSync(payloadDir); } catch {  }
 
-  for (const name of ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md']) {
-    const p = path.join(projectRoot, name);
+  const cfgPath = path.join(_stateDirFor(projectRoot), 'config.json');
+  let installedRuntimes = [];
+  try {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    installedRuntimes = cfg.runtimes || (cfg.runtime ? [cfg.runtime] : []);
+  } catch {}
+
+  const legacyFiles = ['CLAUDE.md', 'AGENTS.md', 'GEMINI.md'];
+  const extraFiles = [];
+  for (const id of installedRuntimes) {
+    if (LEGACY_AGENTS.has(id)) continue;
+    const meta = registryMod.getRuntimeMeta(id);
+    if (!meta) continue;
+    extraFiles.push(registryMod.runtimeAgentsPath(meta, 'local', projectRoot));
+  }
+
+  const toStrip = legacyFiles
+    .map((n) => path.join(projectRoot, n))
+    .concat(extraFiles);
+  for (const p of toStrip) {
     if (!fs.existsSync(p)) continue;
     const stripped = managedBlockMod.stripBlock(fs.readFileSync(p, 'utf-8'));
     if (!stripped || !stripped.trim()) {

@@ -16,17 +16,17 @@ function writeClaudeMd(dir) {
 test('parseInstallFlags: handles --agent, --scope, --mcp, --yes in space and equals form', () => {
   const { parseInstallFlags } = require('../../bin/install.js');
   const cases = [
-    [['--agent', 'gemini'], { agent: 'gemini', scope: null, mcp: false, yes: false }],
-    [['--agent=codex'], { agent: 'codex', scope: null, mcp: false, yes: false }],
-    [['--scope', 'global'], { agent: null, scope: 'global', mcp: false, yes: false }],
-    [['--scope=local'], { agent: null, scope: 'local', mcp: false, yes: false }],
-    [['--mcp'], { agent: null, scope: null, mcp: true, yes: false }],
-    [['--yes'], { agent: null, scope: null, mcp: false, yes: true }],
-    [['-y'], { agent: null, scope: null, mcp: false, yes: true }],
+    [['--agent', 'gemini'], { agent: 'gemini', agents: null, scope: null, mcp: false, yes: false }],
+    [['--agent=codex'], { agent: 'codex', agents: null, scope: null, mcp: false, yes: false }],
+    [['--scope', 'global'], { agent: null, agents: null, scope: 'global', mcp: false, yes: false }],
+    [['--scope=local'], { agent: null, agents: null, scope: 'local', mcp: false, yes: false }],
+    [['--mcp'], { agent: null, agents: null, scope: null, mcp: true, yes: false }],
+    [['--yes'], { agent: null, agents: null, scope: null, mcp: false, yes: true }],
+    [['-y'], { agent: null, agents: null, scope: null, mcp: false, yes: true }],
     [['--agent=claude', '--scope=local', '--mcp', '--yes'],
-      { agent: 'claude', scope: 'local', mcp: true, yes: true }],
+      { agent: 'claude', agents: null, scope: 'local', mcp: true, yes: true }],
     [['-a', 'opencode', '-s', 'global'],
-      { agent: 'opencode', scope: 'global', mcp: false, yes: false }],
+      { agent: 'opencode', agents: null, scope: 'global', mcp: false, yes: false }],
   ];
   for (const [args, expected] of cases) {
     const { flags } = parseInstallFlags(args);
@@ -179,7 +179,7 @@ test('install-flags: without flags, asks runtime and scope questions', async (t)
     },
   });
 
-  assert.ok(asked.some((q) => /Welche Runtime/.test(q)),
+  assert.ok(asked.some((q) => /Which runtime/i.test(q)),
     'runtime question must be asked when --agent absent');
   assert.ok(asked.some((q) => /Installation scope/.test(q)),
     'scope question must be asked when --scope absent');
