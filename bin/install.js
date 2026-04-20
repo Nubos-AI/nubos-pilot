@@ -681,8 +681,10 @@ async function main() {
       return await runInstall({ cwd, mode: detectMode(cwd), flags });
     case '--dry-run':
       return await runInstall({ cwd, mode: detectMode(cwd), dryRun: true, flags });
-    case 'update':
-      return await runInstall({ cwd, mode: 'update', flags });
+    case 'update': {
+      const detected = detectMode(cwd);
+      return await runInstall({ cwd, mode: detected === 'init' ? 'init' : 'update', flags });
+    }
     case 'uninstall':
       return await runUninstall({ cwd, args: rest.slice(1) });
     case 'doctor': {
