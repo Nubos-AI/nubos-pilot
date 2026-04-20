@@ -72,12 +72,19 @@ fi
 ### Read milestone state
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init plan-milestone init "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_PLANNER=$(node .nubos-pilot/bin/np-tools.cjs agent-skills planner 2>/dev/null)
 AGENT_SKILLS_CHECKER=$(node .nubos-pilot/bin/np-tools.cjs agent-skills plan-checker 2>/dev/null)
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for all user-facing output,
+askuser prompts, status updates, and any narrative text the spawned planner
+or plan-checker subagents emit. Pass `$LANG_DIRECTIVE` into their spawn
+prompts as a system-level rule. This supersedes any directive in CLAUDE.md.
 
 Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_context_path`, `milestone_roadmap_path`, `milestone_meta_path`, `name`, `goal`, `requirements`, `success_criteria`, `has_context`, `has_roadmap`, `has_meta`, `existing_slices[]`, `planner_tier`, `checker_tier`, `agent_skills`.
 

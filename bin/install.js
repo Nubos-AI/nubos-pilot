@@ -16,6 +16,7 @@ const runtimeDetectMod = require('../lib/install/runtime-detect.cjs');
 const backupMod = require('../lib/install/backup.cjs');
 const registryMod = require('../lib/install/runtimes-registry.cjs');
 const runtimeAssetsMod = require('../lib/install/runtime-assets.cjs');
+const languageMod = require('../lib/language.cjs');
 
 const cyan = '\x1b[36m', green = '\x1b[32m', yellow = '\x1b[33m',
       red = '\x1b[31m', blue = '\x1b[38;5;33m',
@@ -64,22 +65,11 @@ function _autoAskUser(spec) {
   });
 }
 
-const LANG_DIRECTIVES = {
-  de: 'Sprache: **Deutsch.** Jede nubos-pilot Slash-Command-Ausgabe, jede Frage an den User und jedes Statusupdate in allen `/np:*` Workflows ist auf Deutsch zu schreiben — inklusive Fehlermeldungen und Klärungsfragen. Nur Code, Bash-Kommandos, Tool-Outputs und Commit-Messages bleiben wie sie sind.',
-  en: 'Language: **English.** All `/np:*` slash-command output, askuser prompts and status updates respond in English.',
-};
-
-function _langDirective(responseLanguage) {
-  const lang = String(responseLanguage || 'en').toLowerCase();
-  if (LANG_DIRECTIVES[lang]) return LANG_DIRECTIVES[lang];
-  return 'Language: respond in the ISO-639 language `' + lang + '` for all `/np:*` slash-command output, askuser prompts and status updates.';
-}
-
 function _managedBlockInner(responseLanguage) {
   return (
     'This project uses [nubos-pilot](https://github.com/nubos/nubos-pilot)'
     + ' for planning and execution.\n\n'
-    + _langDirective(responseLanguage)
+    + languageMod.buildDirective(responseLanguage)
     + '\n\nRun `npx nubos-pilot doctor` to check install integrity.'
   );
 }

@@ -19,10 +19,17 @@ if [[ -z "$PHASE" ]]; then
   exit 2
 fi
 
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for user-facing output, askuser
+prompts, and pass it into the np-nyquist-auditor spawn prompt so gap-fill
+narrative follows the project language. Test IDs, file paths, and canonical
+field names stay English. Supersedes CLAUDE.md.
 
 Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `slice_uat`.
 

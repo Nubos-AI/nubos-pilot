@@ -51,9 +51,15 @@ Never:
 ## Single-Call Init
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init discuss-project ${BOOTSTRAP:+--bootstrap})
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for all askuser prompt texts,
+narrative status updates, and the prose written into PROJECT.md sections.
+Supersedes CLAUDE.md managed block.
 
 Parse: `mode`, `sub_mode` (`bootstrap` or `refresh`), `project_md_exists`,
 `scan_context`, `questions[]`, `required_fields[]`.

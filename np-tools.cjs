@@ -45,6 +45,7 @@ const topLevelCommands = {
   'metrics':        require('./bin/np-tools/metrics.cjs'),
   'resolve-model':  require('./bin/np-tools/resolve-model.cjs'),
   'stats':          require('./bin/np-tools/stats.cjs'),
+  'lang-directive': require('./bin/np-tools/lang-directive.cjs'),
 };
 
 const THRESHOLD = 16 * 1024;

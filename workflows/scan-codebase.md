@@ -60,9 +60,17 @@ end.
 Scan, group, write manifest + stubs, emit module-facts in one call:
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 PLAN=$(node .nubos-pilot/bin/np-tools.cjs scan-codebase --project-name "$PROJECT_NAME")
 if [[ "$PLAN" == @file:* ]]; then PLAN=$(cat "${PLAN#@file:}"); fi
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for user-facing output and
+askuser prompts. Pass it into any writer-subagent spawn so module-doc
+prose (overview, responsibilities, notes) follows the project language.
+Module IDs, file paths, symbol names, and language labels stay canonical
+English. Supersedes CLAUDE.md.
 
 `--project-name` is optional; when provided it goes into `INDEX.md`. Other
 flags: `--batch-size N` (default 500), `--max-files N`.

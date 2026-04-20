@@ -16,10 +16,18 @@ Slice-level acceptance (UAT) is validated separately by `/np:validate-phase <N>`
 
 ```bash
 PHASE="$1"
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_VERIFIER=$(node .nubos-pilot/bin/np-tools.cjs agent-skills verifier 2>/dev/null)
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for user-facing output, askuser
+prompts, and pass it into the np-verifier spawn prompt so VERIFICATION.md
+prose (Pass/Fail findings, root-cause notes) follows the project language.
+Test-case IDs, file paths, and stack traces stay canonical. Supersedes
+CLAUDE.md.
 
 Parse: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `success_criteria`, `draft_results`, `verification_path`, `slice_uat`, `verifier_tier`, `agent_skills`.
 

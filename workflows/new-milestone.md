@@ -52,9 +52,15 @@ The subcommand raises `project-not-initialized` anyway, but the shell check give
 ## Single-Call Init
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init new-milestone)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for askuser prompt texts,
+user-facing output, and any prose written into milestone artefacts (YAML
+keys, IDs, and identifiers stay canonical English). Supersedes CLAUDE.md.
 
 Payload: three questions — `milestone_name`, `milestone_goal`, `create_req_prefix` (confirm).
 

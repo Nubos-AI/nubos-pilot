@@ -19,9 +19,16 @@ workflow delivers PLAN-01 and nothing beyond it.
 ## Initialize
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init discuss-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative for this workflow. Obey it for ALL
+subsequent output, askuser prompt texts, status updates, and the CONTEXT.md
+rendering. This supersedes any directive in CLAUDE.md managed block if they
+conflict — the config is the single source of truth.
 
 Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`,
 `milestone_context_path`, `has_context`, `has_milestone_dir`, `goal`,
@@ -118,11 +125,16 @@ Capture the idea in a "Deferred Ideas" section. Don't lose it, don't act on it.
 ## Answer Validation
 
 <answer_validation>
-**IMPORTANT: Answer validation** — After every interactive prompt, check if the
-response is empty or whitespace-only. If so:
-1. Retry the question once with the same parameters
-2. If still empty, present the options as a plain-text numbered list and ask
-   the user to type their choice number
+**IMPORTANT: Answer validation** — After every interactive prompt, check the
+exit code and the response:
+1. If `askuser` exits with structured error `askuser-no-tty` (exit code 1,
+   stderr JSON with `"code":"askuser-no-tty"`), **skip retry** and fall back
+   immediately to the plain-text numbered list described below — the runtime
+   cannot prompt interactively in this session.
+2. If the response is empty or whitespace-only (exit 0 but no value), retry
+   the question once with the same parameters.
+3. If still empty, present the options as a plain-text numbered list and ask
+   the user to type their choice number.
 Never proceed with an empty answer.
 
 **Text mode (`workflow.text_mode: true` in config or `--text` flag):**

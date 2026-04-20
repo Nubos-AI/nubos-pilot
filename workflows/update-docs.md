@@ -51,9 +51,16 @@ If `.doc-index.json` is missing, fall back to a full rescan via
 ## Single-Call Init
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 PLAN=$(node .nubos-pilot/bin/np-tools.cjs update-docs)
 if [[ "$PLAN" == @file:* ]]; then PLAN=$(cat "${PLAN#@file:}"); fi
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for user-facing output and
+askuser prompts. Pass it into any writer-subagent spawn so refreshed
+module-doc prose follows the project language. Module IDs, file paths,
+and symbol names stay canonical English. Supersedes CLAUDE.md.
 
 Parse: `mode`, `diff_summary` (added/removed/changed/unchanged counts),
 `stale_modules[]`, `added_modules[]`, `removed_modules[]`.

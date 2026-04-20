@@ -92,10 +92,17 @@ payload; larger payloads are written to a tmp file and referenced via
 `@file:<path>`.
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init research-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for user-facing output and
+askuser prompts, and pass it into the np-researcher spawn prompt so
+RESEARCH.md prose (not URLs, citations, or code snippets) follows the
+project language. This supersedes CLAUDE.md.
 
 `RUNTIME` is resolved once here and reused by the metrics-record call at the
 researcher spawn site (Step 4) per D-06 workflow-writer pattern.

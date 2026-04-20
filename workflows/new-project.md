@@ -106,9 +106,16 @@ Use the scan to propose:
 The 5 structural questions. All prompts go through the askuser gateway.
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init new-project)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for all askuser prompt texts,
+user-facing output, and any narrative prose written into PROJECT.md /
+REQUIREMENTS.md (field names and YAML keys stay canonical English).
+Supersedes CLAUDE.md.
 
 ```bash
 ANS_PROJECT_NAME=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"Project name?"}')

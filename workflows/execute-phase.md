@@ -16,11 +16,19 @@ Execute every slice of a milestone in wave order: slice S001 first (all its task
 
 ```bash
 PHASE="$1"
-INIT=$(node .nubos-pilot/bin/np-tools.cjs init execute-milestone "$PHASE")
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init execute-milestone init "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_EXECUTOR=$(node .nubos-pilot/bin/np-tools.cjs agent-skills executor 2>/dev/null)
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative for this workflow. Obey it for all user-
+facing output, askuser prompts, and status updates. Pass `$LANG_DIRECTIVE`
+into every np-executor spawn prompt as a system-level rule so task summaries
+and checkpoint notes follow the project language. This supersedes any
+directive in CLAUDE.md managed block.
 
 Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `waves[]` (each with `wave` (= slice number), `slice_id`, `slice_full_id`, `slice_dir`, `tasks[]`), `total_tasks`, `slice_count`, `executor_tier`, `agent_skills`.
 

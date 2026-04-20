@@ -32,6 +32,7 @@ record. Pitfall 9 / `workflow-missing-metrics` is exempt.
 ## Initialize
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 SINCE_OVERRIDE=""
 for arg in "$@"; do
   case "$arg" in
@@ -48,6 +49,12 @@ NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 LOCAL_FILENAME_TS=$(date +"%Y-%m-%dT%H%M")
 REPORT_PATH="${REPORTS_DIR}/${LOCAL_FILENAME_TS}-session-report.md"
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for the report's narrative
+sections (summary, highlights, notable events) and any askuser prompts.
+Task IDs, milestone IDs, commit SHAs, metrics keys, and file paths stay
+canonical English. Supersedes CLAUDE.md.
 
 The filename format is `YYYY-MM-DDTHHMM-session-report.md` (D-17 —
 4-char HHMM, no seconds, local time) so reports sort

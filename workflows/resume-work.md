@@ -13,9 +13,16 @@ on each accordingly.
 ## Initialize
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init resume-work)
 STATUS=$(echo "$INIT" | node -e "process.stdin.on('data', d => console.log(JSON.parse(d).status))")
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for user-facing output and
+askuser prompts. When spawning the np-executor to continue a checkpoint,
+pass `$LANG_DIRECTIVE` into the spawn prompt so resumed task summaries
+follow the project language. Supersedes CLAUDE.md.
 
 ## Execution
 

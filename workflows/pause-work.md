@@ -15,8 +15,13 @@ progress.
 ## Execution
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 node .nubos-pilot/bin/np-tools.cjs init pause-work
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+Obey `$LANG_DIRECTIVE` for the resume-hint narration and any status lines
+printed around the JSON payload. Supersedes CLAUDE.md.
 
 Output is a small JSON payload `{ ok, stopped_at, resume_file }`. The
 workflow simply displays it.
