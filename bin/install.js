@@ -166,7 +166,7 @@ function _writeToolsShim(projectRoot) {
     + '  process.stderr.write("nubos-pilot: tool binary fehlt unter " + TARGET + "\\nFix: npx nubos-pilot@latest update\\n");\n'
     + '  process.exit(1);\n'
     + '}\n'
-    + 'require(TARGET);\n';
+    + 'require(TARGET).main();\n';
   fs.mkdirSync(shimDir, { recursive: true });
   atomicWriteFileSync(shimPath, body);
   try { fs.chmodSync(shimPath, 0o755); } catch {}
