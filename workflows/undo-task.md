@@ -29,7 +29,7 @@ fi
 ## Apply
 
 ```bash
-RESULT=$(node np-tools.cjs undo-task "$TASK_ID")
+RESULT=$(node .nubos-pilot/bin/np-tools.cjs undo-task "$TASK_ID")
 echo "$RESULT" | jq .
 ```
 

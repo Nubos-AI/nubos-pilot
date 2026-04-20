@@ -17,7 +17,7 @@ sentinels survive regeneration.
 
 ```bash
 PHASE="$1"
-INIT=$(node np-tools.cjs init add-tests "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init add-tests "$PHASE")
 ```
 
 Parse: `phase`, `target_path`, `verification_path`, `pass_cases[]`,
@@ -29,7 +29,7 @@ Parse: `phase`, `target_path`, `verification_path`, `pass_cases[]`,
 Emit/merge the Sentinel block:
 
 ```bash
-node np-tools.cjs init add-tests emit "$PHASE"
+node .nubos-pilot/bin/np-tools.cjs init add-tests emit "$PHASE"
 ```
 
 Smoke-run the generated file to catch syntax errors early:

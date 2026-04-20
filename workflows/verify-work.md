@@ -16,9 +16,9 @@ Slice-level acceptance (UAT) is validated separately by `/np:validate-phase <N>`
 
 ```bash
 PHASE="$1"
-INIT=$(node np-tools.cjs init verify-work "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_VERIFIER=$(node np-tools.cjs agent-skills verifier 2>/dev/null)
+AGENT_SKILLS_VERIFIER=$(node .nubos-pilot/bin/np-tools.cjs agent-skills verifier 2>/dev/null)
 ```
 
 Parse: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `success_criteria`, `draft_results`, `verification_path`, `slice_uat`, `verifier_tier`, `agent_skills`.
@@ -35,7 +35,7 @@ The agent emits a structured verdict per SC: Pass | Fail | Needs-User-Confirm | 
 Persist the deterministic draft:
 
 ```bash
-node np-tools.cjs init verify-work emit-draft "$PHASE"
+node .nubos-pilot/bin/np-tools.cjs init verify-work emit-draft "$PHASE"
 ```
 
 ## Pass 2 — user-driven gate for needs_user_confirm
@@ -44,7 +44,7 @@ For each result flagged `needs_user_confirm` by Pass 1, ask the user:
 
 ```bash
 # Example — iterated by the workflow over each needs_user_confirm SC.
-CHOICE=$(node np-tools.cjs askuser --json '{
+CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "header": "SC-3: UX feels responsive",
   "question": "Ist dieses Kriterium erfüllt?",
@@ -55,7 +55,7 @@ CHOICE=$(node np-tools.cjs askuser --json '{
     {"label": "Re-investigate", "description": "Brauche mehr Evidence — spawn Verifier nochmal."}
   ]
 }')
-node np-tools.cjs init verify-work record-sc "$PHASE" "SC-3" "$CHOICE"
+node .nubos-pilot/bin/np-tools.cjs init verify-work record-sc "$PHASE" "SC-3" "$CHOICE"
 ```
 
 ## Hard-stop on Fail

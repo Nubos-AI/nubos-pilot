@@ -10,5 +10,5 @@ List every available `np-tools.cjs` command grouped by category. Pass `--json`
 for programmatic consumption.
 
 ```bash
-node np-tools.cjs help
+node .nubos-pilot/bin/np-tools.cjs help
 ```

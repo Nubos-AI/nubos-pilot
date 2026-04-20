@@ -26,7 +26,7 @@ metrics record. The `workflow-missing-metrics` lint in
 `bin/check-workflows.cjs` only fires on `Task(` / `Spawn agent=` sites,
 so CRUD-only workflows are exempt (Pitfall 9 resolution from
 Plan 10-05). Interactive prompts route through
-`node np-tools.cjs askuser --json` per INST-03.
+`node .nubos-pilot/bin/np-tools.cjs askuser --json` per INST-03.
 
 ## Initialize
 
@@ -68,7 +68,7 @@ fi
 mkdir -p "$NOTES_DIR"
 DATE=$(date +%Y-%m-%d)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-SLUG=$(node np-tools.cjs generate-slug "$TEXT" --raw)
+SLUG=$(node .nubos-pilot/bin/np-tools.cjs generate-slug "$TEXT" --raw)
 if [[ -z "$SLUG" ]]; then
   echo "Error: note text produced no slug-safe characters." >&2
   exit 1
@@ -76,7 +76,7 @@ fi
 NOTE_PATH="${NOTES_DIR}/${DATE}-${SLUG}.md"
 ```
 
-Slug generation is delegated to `node np-tools.cjs generate-slug`
+Slug generation is delegated to `node .nubos-pilot/bin/np-tools.cjs generate-slug`
 (which wraps `lib/layout.cjs.slugify`) — the same filename-safety
 rails used by every capture workflow (only `[a-z0-9-]` enter the
 filename).
@@ -90,7 +90,7 @@ file.
 
 ```bash
 if [[ -f "$NOTE_PATH" ]]; then
-  CHOICE=$(node np-tools.cjs askuser --json '{
+  CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "header": "Duplicate note",
     "question": "A note already exists at '"${NOTE_PATH}"'. What would you like to do?",
@@ -148,7 +148,7 @@ for that distinction.
 
 ```bash
 if [[ "$SCOPE" == "project" ]]; then
-  node np-tools.cjs commit "docs(10): add note — ${SLUG}" --files "$NOTE_PATH"
+  node .nubos-pilot/bin/np-tools.cjs commit "docs(10): add note — ${SLUG}" --files "$NOTE_PATH"
 else
   echo "Global note written to $NOTE_PATH (not committed — lives outside any project)." >&2
 fi
@@ -177,9 +177,9 @@ Note saved ($SCOPE): $NOTE_PATH
 - For global scope, bypass `lib/core.cjs.findProjectRoot` completely
   (Pitfall 10) so the workflow works from any cwd, including non-repo
   directories.
-- Derive the slug via `node np-tools.cjs generate-slug` so only
+- Derive the slug via `node .nubos-pilot/bin/np-tools.cjs generate-slug` so only
   `[a-z0-9-]` enter the filename.
-- Route the project-scope commit through `node np-tools.cjs commit`
+- Route the project-scope commit through `node .nubos-pilot/bin/np-tools.cjs commit`
   for `lib/git.cjs.assertCommittablePaths()` validation.
 
 **Don't:**
@@ -191,7 +191,7 @@ Note saved ($SCOPE): $NOTE_PATH
   (T-10-05-03 defence-in-depth).
 - Invoke host-specific prompt tools directly (the BARE_ASKUSER lint
   in `bin/check-workflows.cjs` blocks them) — always route through
-  `node np-tools.cjs askuser --json '…'`.
+  `node .nubos-pilot/bin/np-tools.cjs askuser --json '…'`.
 - Mutate STATE.md. Notes are lighter-weight than todos; there is no
   pending-note counter. If you need STATE semantics, use
   `/np:add-todo` instead.
@@ -216,7 +216,7 @@ Note saved ($SCOPE): $NOTE_PATH
       path (Pitfall 10 mitigation — bypasses findProjectRoot).
 - [ ] Project-scope directory resolved via
       `lib/core.cjs.projectStateDir`.
-- [ ] Slug produced via `node np-tools.cjs generate-slug` (only
+- [ ] Slug produced via `node .nubos-pilot/bin/np-tools.cjs generate-slug` (only
       `[a-z0-9-]` enter filename).
 - [ ] Duplicate collisions resolved via `askuser` Pattern S-3
       (Re-run / View / Skip / Append-timestamp).

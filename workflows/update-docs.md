@@ -51,7 +51,7 @@ If `.doc-index.json` is missing, fall back to a full rescan via
 ## Single-Call Init
 
 ```bash
-PLAN=$(node np-tools.cjs update-docs)
+PLAN=$(node .nubos-pilot/bin/np-tools.cjs update-docs)
 if [[ "$PLAN" == @file:* ]]; then PLAN=$(cat "${PLAN#@file:}"); fi
 ```
 
@@ -84,7 +84,7 @@ For each module in `stale_modules ++ added_modules`:
 
 ```bash
 # Build prompt from facts, dispatch agent, capture JSON to $PROSE_FILE
-node np-tools.cjs update-docs --apply-prose \
+node .nubos-pilot/bin/np-tools.cjs update-docs --apply-prose \
   --module "$MODULE_ID" \
   --prose-file "$PROSE_FILE"
 ```

@@ -30,7 +30,7 @@ if [[ -z "$SLUG_ARG" ]]; then
   echo "Usage: /np:thread <slug-or-title>" >&2
   exit 2
 fi
-SLUG=$(node np-tools.cjs generate-slug "$SLUG_ARG" --raw)
+SLUG=$(node .nubos-pilot/bin/np-tools.cjs generate-slug "$SLUG_ARG" --raw)
 if [[ -z "$SLUG" ]]; then
   echo "Error: argument produced no slug-safe characters." >&2
   exit 1
@@ -90,13 +90,13 @@ last_resumed: <TODAY>
 - *(what the next session should do first)*
 ```
 
-Route the commit through `node np-tools.cjs commit` so
+Route the commit through `node .nubos-pilot/bin/np-tools.cjs commit` so
 `lib/git.cjs.assertCommittablePaths()` validates the path before
 `git add` (path-traversal guard from Plan 10-01-T04).
 
 ```bash
 if [[ "$MODE" == "create" ]]; then
-  node np-tools.cjs commit "docs(10): create thread — ${SLUG}" --files "$THREAD_PATH"
+  node .nubos-pilot/bin/np-tools.cjs commit "docs(10): create thread — ${SLUG}" --files "$THREAD_PATH"
   echo "Thread created: $THREAD_PATH"
   echo ""
   echo "Resume anytime with: /np:thread ${SLUG}"
@@ -167,13 +167,13 @@ Echo `Thread <MODE>d: <THREAD_PATH>` with slug/mode/today to stdout.
   command in this adapted port).
 - Use `lib/core.cjs.atomicWriteFileSync` for any in-place rewrite
   (ADR-0004 crash-safety).
-- Route the create-branch commit through `node np-tools.cjs commit`.
+- Route the create-branch commit through `node .nubos-pilot/bin/np-tools.cjs commit`.
 
 **Don't:**
 - Commit `last_resumed`-only updates. Resume is commit-free.
 - Invoke host-specific prompt tools directly (the BARE_ASKUSER lint
   in `bin/check-workflows.cjs` blocks them) — route through
-  `node np-tools.cjs askuser --json '…'`.
+  `node .nubos-pilot/bin/np-tools.cjs askuser --json '…'`.
 - Bypass `atomicWriteFileSync` — rename pair is the invariant.
 - Add a `metrics record` block. No Task/Spawn site here; Pitfall 9 /
   `workflow-missing-metrics` is exempt.

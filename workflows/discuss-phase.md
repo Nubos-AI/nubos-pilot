@@ -19,7 +19,7 @@ workflow delivers PLAN-01 and nothing beyond it.
 ## Initialize
 
 ```bash
-INIT=$(node np-tools.cjs init discuss-phase "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init discuss-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -146,7 +146,7 @@ Text mode applies to ALL workflows in the session, not just discuss-phase.
 If `has_context` is `true`, ask the user how to proceed:
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "prompt": "Milestone '"$MILESTONE_ID"' already has a CONTEXT.md. What do you want to do?",
   "options": [
@@ -184,7 +184,7 @@ user expects (users sometimes discover the roadmap goal is stale before
 discussion starts):
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "confirm",
   "prompt": "ROADMAP goal for phase '"$PHASE"': \"'"$GOAL"'\". Still accurate?",
   "default": true
@@ -195,7 +195,7 @@ If the user says `no`, capture the refined goal with a free-text input call
 and record it for the `<domain>` section of CONTEXT.md:
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "input",
   "prompt": "Refined goal for phase '"$PHASE"':"
 }'
@@ -208,7 +208,7 @@ generic UI/UX labels — specific decisions like "Session handling", "Error
 responses", "Multi-device policy"). Present them via a multi-select:
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "multiselect",
   "prompt": "Which areas do you want to discuss for '"$PHASE_NAME"'?",
   "options": [
@@ -233,20 +233,20 @@ Per area, the recommended flow is:
 
 ```bash
 # Decision question (typed as select when options exist)
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "prompt": "For <area>: <specific decision>?",
   "options": ["<choice A>", "<choice B>", "<choice C>"]
 }'
 
 # Follow-up free-text capture when the user picks "Other" or needs nuance
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "input",
   "prompt": "Anything specific about <area> downstream agents must know?"
 }'
 
 # Continuation gate
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "prompt": "More questions about <area>, or move on?",
   "options": ["More questions", "Next area"]
@@ -256,7 +256,7 @@ node np-tools.cjs askuser --json '{
 After all selected areas are covered:
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "prompt": "We have discussed <areas>. Anything else before we write CONTEXT.md?",
   "options": ["Explore more gray areas", "I am ready for CONTEXT.md"]
@@ -277,35 +277,35 @@ Collect short free-text inputs for the remaining required sections before
 rendering:
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "input",
   "prompt": "Canonical refs (paths to ADRs/specs/docs downstream agents must read) — comma separated or \"none\":"
 }'
 ```
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "input",
   "prompt": "Reusable code / existing assets relevant to this phase — or \"none\":"
 }'
 ```
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "input",
   "prompt": "Specific references (\"I want it like X\" moments) — or \"none\":"
 }'
 ```
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "input",
   "prompt": "Deferred ideas (things we noted but belong in later phases) — or \"none\":"
 }'
 ```
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "input",
   "prompt": "Claude\u2019s Discretion — areas where you want Claude to decide without asking:"
 }'
@@ -356,7 +356,7 @@ that error. Fix the template or the accumulator, don't mask the failure.
 ### Step 7: Commit respecting config.commit_docs
 
 ```bash
-COMMIT_DOCS=$(node np-tools.cjs config-get workflow.commit_docs 2>/dev/null || echo "true")
+COMMIT_DOCS=$(node .nubos-pilot/bin/np-tools.cjs config-get workflow.commit_docs 2>/dev/null || echo "true")
 if [[ "$COMMIT_DOCS" == "true" ]]; then
   git add "$CONTEXT_PATH"
   git commit -m "docs($MILESTONE_ID): capture milestone context"
@@ -369,7 +369,7 @@ opting into manual commit gating.
 ### Step 8: Confirm and next steps
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "confirm",
   "prompt": "CONTEXT.md written at '"$CONTEXT_PATH"'. Run np:plan-phase '"$PHASE"' now?",
   "default": true

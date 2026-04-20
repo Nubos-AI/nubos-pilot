@@ -51,7 +51,7 @@ Never:
 ## Single-Call Init
 
 ```bash
-INIT=$(node np-tools.cjs init discuss-project ${BOOTSTRAP:+--bootstrap})
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init discuss-project ${BOOTSTRAP:+--bootstrap})
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -134,7 +134,7 @@ REQ_FILE=$(mktemp -t np-proposed-reqs-XXXXXX.json)
 ANSWERS=$(mktemp -t np-discuss-project-answers.XXXXXX.json)
 # Write the six answer fields as JSON
 
-node np-tools.cjs init discuss-project --apply "$ANSWERS" \
+node .nubos-pilot/bin/np-tools.cjs init discuss-project --apply "$ANSWERS" \
   ${BOOTSTRAP:+--bootstrap} \
   ${REQ_FILE:+--proposed-requirements "$REQ_FILE"}
 ```
@@ -145,7 +145,7 @@ and appends a "Proposed" block to REQUIREMENTS.md. Both writes are atomic.
 ### Step 5: Commit respecting config.commit_docs
 
 ```bash
-COMMIT_DOCS=$(node np-tools.cjs config-get workflow.commit_docs 2>/dev/null || echo "true")
+COMMIT_DOCS=$(node .nubos-pilot/bin/np-tools.cjs config-get workflow.commit_docs 2>/dev/null || echo "true")
 if [[ "$COMMIT_DOCS" == "true" ]]; then
   git add .nubos-pilot/PROJECT.md .nubos-pilot/REQUIREMENTS.md 2>/dev/null || true
   git commit -m "docs: np:discuss-project ${BOOTSTRAP:+bootstrap}${BOOTSTRAP:-refresh}" 2>/dev/null || true

@@ -18,7 +18,7 @@ metrics record. The `workflow-missing-metrics` lint in
 `bin/check-workflows.cjs` only fires on `Task(` / `Spawn agent=` sites,
 so CRUD-only workflows are exempt (Pitfall 9 resolution from
 Plan 10-05). All interactive prompts route through
-`node np-tools.cjs askuser --json` per INST-03.
+`node .nubos-pilot/bin/np-tools.cjs askuser --json` per INST-03.
 
 ## Initialize
 
@@ -29,7 +29,7 @@ if [[ -z "$DESCRIPTION" ]]; then
   exit 2
 fi
 
-INIT=$(node np-tools.cjs init add-todo "$DESCRIPTION")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init add-todo "$DESCRIPTION")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 
 SLUG=$(echo "$INIT" | jq -r '.slug')
@@ -64,7 +64,7 @@ skip (keep both), or rename-with-counter (append `-2`, `-3`, etc.).
 
 ```bash
 if [[ -f "$TODO_PATH" ]]; then
-  CHOICE=$(node np-tools.cjs askuser --json '{
+  CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "header": "Duplicate todo",
     "question": "A todo already exists at '"${TODO_PATH}"'. What would you like to do?",
@@ -135,12 +135,12 @@ frontmatter. The lock serialises concurrent writers (two parallel
 
 ## Commit
 
-Route through `node np-tools.cjs commit` so
+Route through `node .nubos-pilot/bin/np-tools.cjs commit` so
 `lib/git.cjs.assertCommittablePaths()` validates the paths before
 `git add` (path-traversal guard from Plan 10-01-T04).
 
 ```bash
-node np-tools.cjs commit "docs(10): add todo — ${SLUG}" --files "$TODO_PATH" "$STATE_PATH"
+node .nubos-pilot/bin/np-tools.cjs commit "docs(10): add todo — ${SLUG}" --files "$TODO_PATH" "$STATE_PATH"
 ```
 
 Both the new todo file and STATE.md land in a single atomic commit per
@@ -167,16 +167,16 @@ Use /np:next to surface this todo in the next-step picker.
   (D-20 single-writer lock; T-10-05-06 mitigation).
 - Use the `Write` tool for the new markdown file — never a bash
   heredoc or `echo >`.
-- Route the final commit through `node np-tools.cjs commit` so
+- Route the final commit through `node .nubos-pilot/bin/np-tools.cjs commit` so
   `lib/git.cjs.assertCommittablePaths()` runs the gitignore-guard.
-- Derive the slug via `node np-tools.cjs init add-todo` (filename
+- Derive the slug via `node .nubos-pilot/bin/np-tools.cjs init add-todo` (filename
   sanitisation, T-10-05-01 mitigation) — not via ad-hoc `sed`.
 - Commit todo file + STATE.md together as a single atomic unit.
 
 **Don't:**
 - Invoke host-specific prompt tools directly (the BARE_ASKUSER lint in
   `bin/check-workflows.cjs` blocks them) — always route through
-  `node np-tools.cjs askuser --json '…'`.
+  `node .nubos-pilot/bin/np-tools.cjs askuser --json '…'`.
 - Read STATE.md via raw filesystem calls (DIRECT_READ lint blocks
   those patterns) — let `mutateState` handle the lock.
 - Add a `metrics record` block. There is no Task/Spawn site in this

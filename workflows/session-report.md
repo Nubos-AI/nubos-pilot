@@ -149,11 +149,11 @@ truncated file.
 ## Commit
 
 Both the new report and the updated pointer land in a single atomic
-docs commit per ADR-0004. Route through `node np-tools.cjs commit`
+docs commit per ADR-0004. Route through `node .nubos-pilot/bin/np-tools.cjs commit`
 so `lib/git.cjs.assertCommittablePaths()` validates the paths.
 
 ```bash
-node np-tools.cjs commit "docs(10): add session report — ${LOCAL_FILENAME_TS}" \
+node .nubos-pilot/bin/np-tools.cjs commit "docs(10): add session report — ${LOCAL_FILENAME_TS}" \
   --files "$REPORT_PATH" "$POINTER"
 ```
 
@@ -191,7 +191,7 @@ Session report: $REPORT_PATH
   between the two would skip a session.
 - Invoke host-specific prompt tools directly (the BARE_ASKUSER lint
   in `bin/check-workflows.cjs` blocks them) — route through
-  `node np-tools.cjs askuser --json '…'`.
+  `node .nubos-pilot/bin/np-tools.cjs askuser --json '…'`.
 - Add a `metrics record` block. No Task/Spawn site; Pitfall 9 /
   `workflow-missing-metrics` is exempt.
 </scope_guardrail>

@@ -15,7 +15,7 @@ progress.
 ## Execution
 
 ```bash
-node np-tools.cjs init pause-work
+node .nubos-pilot/bin/np-tools.cjs init pause-work
 ```
 
 Output is a small JSON payload `{ ok, stopped_at, resume_file }`. The

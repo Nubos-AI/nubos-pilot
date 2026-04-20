@@ -21,7 +21,7 @@ if [ -z "$TASK_ID" ]; then
   echo "Usage: /np:unpark <task-id>" >&2
   exit 1
 fi
-node np-tools.cjs unpark "$TASK_ID"
+node .nubos-pilot/bin/np-tools.cjs unpark "$TASK_ID"
 ```
 
 ## Scope Guardrail

@@ -32,7 +32,7 @@ No argument required. If `STATE.current_task` is null **and** no explicit id was
 ## Apply
 
 ```bash
-RESULT=$(node np-tools.cjs reset-slice ${1:+"$1"})
+RESULT=$(node .nubos-pilot/bin/np-tools.cjs reset-slice ${1:+"$1"})
 echo "$RESULT" | jq .
 ```
 

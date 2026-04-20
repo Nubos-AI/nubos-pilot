@@ -19,7 +19,7 @@ if [[ -z "$PHASE" ]]; then
   exit 2
 fi
 
-INIT=$(node np-tools.cjs init verify-work "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
@@ -60,7 +60,7 @@ If a prior audit is present, let the user choose Re-run / View / Skip. The templ
 ```bash
 RERUN="false"
 if [[ -f "$VALIDATION_PATH" ]]; then
-  CHOICE=$(node np-tools.cjs askuser --json '{
+  CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "header": "Existing VALIDATION.md",
     "question": "VALIDATION.md already exists for milestone '"$MILESTONE_ID"'. What would you like to do?",
@@ -105,8 +105,8 @@ fi
 The auditor reads `REQUIREMENTS.md`, filters to the milestone's declared requirement IDs (from `roadmap.yaml milestones[].requirements`), and scans every task PLAN.md frontmatter `requirements:` field plus every slice's SUMMARY.md for cross-reference coverage. It then inspects test files for each requirement ID.
 
 ```bash
-START=$(node np-tools.cjs metrics start-timestamp)
-MODEL=$(node np-tools.cjs resolve-model np-nyquist-auditor --profile frontier)
+START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
+MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model np-nyquist-auditor --profile frontier)
 
 # Build the read list from the init payload:
 SLICE_PLANS=$(find "$MILESTONE_DIR/slices" -maxdepth 2 -name 'S*-PLAN.md' 2>/dev/null)
@@ -120,8 +120,8 @@ TASK_SUMMARIES=$(find "$MILESTONE_DIR/slices" -path '*/tasks/*/T*-SUMMARY.md' 2>
 #   output: $VALIDATION_PATH with per-requirement Nyquist scoring
 #           (COVERED / UNDER_SAMPLED / UNCOVERED), using templates/VALIDATION.md as skeleton.
 
-END=$(node np-tools.cjs metrics end-timestamp)
-node np-tools.cjs metrics record \
+END=$(node .nubos-pilot/bin/np-tools.cjs metrics end-timestamp)
+node .nubos-pilot/bin/np-tools.cjs metrics record \
   --agent np-nyquist-auditor --tier haiku --resolved-model "$MODEL" \
   --phase "$PHASE" --plan "$PLAN_ID" --task "$TASK_ID" \
   --started "$START" --ended "$END" \
@@ -133,7 +133,7 @@ node np-tools.cjs metrics record \
 
 ```bash
 if [[ ! -f "$VALIDATION_PATH" ]]; then
-  CHOICE=$(node np-tools.cjs askuser --json '{
+  CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "header": "VALIDATION.md missing",
     "question": "np-nyquist-auditor did not write VALIDATION.md. What would you like to do?",
@@ -149,7 +149,7 @@ fi
 ## Commit
 
 ```bash
-node np-tools.cjs commit "docs(${MILESTONE_ID}): add validation audit report" --files "$VALIDATION_PATH"
+node .nubos-pilot/bin/np-tools.cjs commit "docs(${MILESTONE_ID}): add validation audit report" --files "$VALIDATION_PATH"
 ```
 
 One atomic docs commit per ADR-0004. The commit helper routes through `lib/git.cjs.assertCommittablePaths` (gitignore-guard) before staging.

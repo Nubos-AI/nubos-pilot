@@ -37,7 +37,7 @@ fi
 ## Apply
 
 ```bash
-RESULT=$(node np-tools.cjs undo "$PREFIX")
+RESULT=$(node .nubos-pilot/bin/np-tools.cjs undo "$PREFIX")
 echo "$RESULT" | jq .
 ```
 

@@ -52,7 +52,7 @@ The subcommand raises `project-not-initialized` anyway, but the shell check give
 ## Single-Call Init
 
 ```bash
-INIT=$(node np-tools.cjs init new-milestone)
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init new-milestone)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
@@ -63,9 +63,9 @@ Payload: three questions — `milestone_name`, `milestone_goal`, `create_req_pre
 Three questions through `np-tools.cjs askuser`. No runtime-native question tool is permitted anywhere in this file.
 
 ```bash
-ANS_MS_NAME=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Milestone name (e.g. Auth & Basic UI)?"}')
-ANS_MS_GOAL=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Milestone goal (one sentence)?"}')
-ANS_REQ_PREFIX=$(node np-tools.cjs askuser --json '{"type":"confirm","prompt":"Create a new Requirements section for this milestone?","default":false}')
+ANS_MS_NAME=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"Milestone name (e.g. Auth & Basic UI)?"}')
+ANS_MS_GOAL=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"Milestone goal (one sentence)?"}')
+ANS_REQ_PREFIX=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"confirm","prompt":"Create a new Requirements section for this milestone?","default":false}')
 ```
 
 <answer_validation>
@@ -89,7 +89,7 @@ node -e '
   fs.writeFileSync(process.env.ANSWERS, JSON.stringify(payload));
 ' ANS_MS_NAME="$ANS_MS_NAME" ANS_MS_GOAL="$ANS_MS_GOAL" ANS_REQ_PREFIX="$ANS_REQ_PREFIX" ANSWERS="$ANSWERS"
 
-node np-tools.cjs init new-milestone --apply "$ANSWERS"
+node .nubos-pilot/bin/np-tools.cjs init new-milestone --apply "$ANSWERS"
 ```
 
 On success the subcommand emits:
@@ -117,7 +117,7 @@ belongs in a separate workflow that the user invokes explicitly.
 ## Optional Commit
 
 ```bash
-if [ "$(node np-tools.cjs config-get workflow.commit_docs 2>/dev/null)" = "true" ]; then
+if [ "$(node .nubos-pilot/bin/np-tools.cjs config-get workflow.commit_docs 2>/dev/null)" = "true" ]; then
   git add .nubos-pilot/
   git commit -m "chore: np:new-milestone add $ANS_MS_NAME"
 fi

@@ -64,10 +64,25 @@ function _autoAskUser(spec) {
   });
 }
 
-const MANAGED_BLOCK_INNER =
-  'This project uses [nubos-pilot](https://github.com/nubos/nubos-pilot)'
-  + ' for planning and execution.\n\nRun `npx nubos-pilot doctor`'
-  + ' to check install integrity.';
+const LANG_DIRECTIVES = {
+  de: 'Sprache: **Deutsch.** Jede nubos-pilot Slash-Command-Ausgabe, jede Frage an den User und jedes Statusupdate in allen `/np:*` Workflows ist auf Deutsch zu schreiben — inklusive Fehlermeldungen und Klärungsfragen. Nur Code, Bash-Kommandos, Tool-Outputs und Commit-Messages bleiben wie sie sind.',
+  en: 'Language: **English.** All `/np:*` slash-command output, askuser prompts and status updates respond in English.',
+};
+
+function _langDirective(responseLanguage) {
+  const lang = String(responseLanguage || 'en').toLowerCase();
+  if (LANG_DIRECTIVES[lang]) return LANG_DIRECTIVES[lang];
+  return 'Language: respond in the ISO-639 language `' + lang + '` for all `/np:*` slash-command output, askuser prompts and status updates.';
+}
+
+function _managedBlockInner(responseLanguage) {
+  return (
+    'This project uses [nubos-pilot](https://github.com/nubos/nubos-pilot)'
+    + ' for planning and execution.\n\n'
+    + _langDirective(responseLanguage)
+    + '\n\nRun `npx nubos-pilot doctor` to check install integrity.'
+  );
+}
 
 const VALID_AGENTS = registryMod.listRuntimeIds();
 const VALID_SCOPES = ['local', 'global'];
@@ -137,6 +152,25 @@ function _opencodeManifestPrefix(scope) {
   return scope === 'global'
     ? '~/.config/opencode/nubos-pilot/'
     : OPENCODE_MANIFEST_PREFIX;
+}
+
+function _writeToolsShim(projectRoot) {
+  const shimDir = path.join(projectRoot, STATE_SUBPATH, 'bin');
+  const shimPath = path.join(shimDir, 'np-tools.cjs');
+  const target = path.resolve(__dirname, '..', 'np-tools.cjs');
+  const body = '#!/usr/bin/env node\n'
+    + "'use strict';\n"
+    + 'const fs = require(\'node:fs\');\n'
+    + 'const TARGET = ' + JSON.stringify(target) + ';\n'
+    + 'if (!fs.existsSync(TARGET)) {\n'
+    + '  process.stderr.write("nubos-pilot: tool binary fehlt unter " + TARGET + "\\nFix: npx nubos-pilot@latest update\\n");\n'
+    + '  process.exit(1);\n'
+    + '}\n'
+    + 'require(TARGET);\n';
+  fs.mkdirSync(shimDir, { recursive: true });
+  atomicWriteFileSync(shimPath, body);
+  try { fs.chmodSync(shimPath, 0o755); } catch {}
+  return shimPath;
 }
 
 function _stateDirFor(projectRoot) {
@@ -254,37 +288,48 @@ const DEFAULT_CLAUDE_MD = '# CLAUDE.md\n\n'
   + 'Project guidance for Claude Code. Add project-specific instructions above the'
   + ' managed block — `npx nubos-pilot` only rewrites the block between the markers.\n';
 
-function _rewriteManagedMarkdown(projectRoot, runtimes) {
+function _rewriteManagedMarkdown(projectRoot, runtimes, responseLanguage) {
+  const innerMd = _managedBlockInner(responseLanguage);
   const claudePath = path.join(projectRoot, 'CLAUDE.md');
-  const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const geminiPath = path.join(projectRoot, 'GEMINI.md');
   const claudeBase = fs.existsSync(claudePath)
     ? fs.readFileSync(claudePath, 'utf-8')
     : DEFAULT_CLAUDE_MD;
-  const claudeNext = managedBlockMod.rewriteBlock(claudeBase, MANAGED_BLOCK_INNER);
-  atomicWriteFileSync(claudePath, claudeNext);
+  const claudeRendered = managedBlockMod.rewriteBlock(claudeBase, innerMd);
 
-  const agentsBase = fs.existsSync(agentsPath)
-    ? fs.readFileSync(agentsPath, 'utf-8')
-    : agentsMdMod.generateAgentsMd(claudeNext, 'codex');
-  atomicWriteFileSync(agentsPath, managedBlockMod.rewriteBlock(agentsBase, MANAGED_BLOCK_INNER));
-
-  const geminiBase = fs.existsSync(geminiPath)
-    ? fs.readFileSync(geminiPath, 'utf-8')
-    : agentsMdMod.generateAgentsMd(claudeNext, 'gemini');
-  atomicWriteFileSync(geminiPath, managedBlockMod.rewriteBlock(geminiBase, MANAGED_BLOCK_INNER));
-
-  const extras = (runtimes || []).filter((id) => !LEGACY_AGENTS.has(id));
-  for (const id of extras) {
+  const ids = Array.isArray(runtimes) && runtimes.length ? runtimes : ['claude'];
+  const written = new Set();
+  for (const id of ids) {
+    if (id === 'opencode') continue;
     const meta = registryMod.getRuntimeMeta(id);
     if (!meta) continue;
     const targetPath = registryMod.runtimeAgentsPath(meta, 'local', projectRoot);
+    if (written.has(targetPath)) continue;
+    written.add(targetPath);
+
+    if (id === 'claude' && path.resolve(targetPath) === path.resolve(claudePath)) {
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      atomicWriteFileSync(targetPath, claudeRendered);
+      continue;
+    }
+
     const base = fs.existsSync(targetPath)
       ? fs.readFileSync(targetPath, 'utf-8')
-      : agentsMdMod.generateAgentsMd(claudeNext, 'codex');
-    const next = managedBlockMod.rewriteBlock(base, MANAGED_BLOCK_INNER);
+      : agentsMdMod.generateAgentsMd(claudeRendered, id === 'gemini' ? 'gemini' : 'codex');
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-    atomicWriteFileSync(targetPath, next);
+    atomicWriteFileSync(targetPath, managedBlockMod.rewriteBlock(base, innerMd));
+  }
+
+  const stalePaths = [claudePath, path.join(projectRoot, 'AGENTS.md'), path.join(projectRoot, 'GEMINI.md')];
+  for (const p of stalePaths) {
+    if (written.has(p)) continue;
+    if (!fs.existsSync(p)) continue;
+    const current = fs.readFileSync(p, 'utf-8');
+    const stripped = managedBlockMod.stripBlock(current);
+    if (stripped.trim().length === 0) {
+      try { fs.unlinkSync(p); } catch {}
+    } else if (stripped !== current) {
+      atomicWriteFileSync(p, stripped);
+    }
   }
 }
 
@@ -464,7 +509,8 @@ async function _runInstallLocked(ctx) {
   }
 
   const selectedRuntimes = (initConfig && initConfig.runtimes) || (initConfig ? [initConfig.runtime] : []);
-  _rewriteManagedMarkdown(projectRoot, selectedRuntimes);
+  const responseLanguage = initConfig && initConfig.response_language;
+  _rewriteManagedMarkdown(projectRoot, selectedRuntimes, responseLanguage);
 
   if (assetPlans.length) {
     runtimeAssetsMod.writeRuntimeAssets(assetPlans);
@@ -472,6 +518,10 @@ async function _runInstallLocked(ctx) {
   const assetStale = diff.stale.filter(runtimeAssetsMod.isAssetManifestKey);
   if (assetStale.length) {
     runtimeAssetsMod.removeStaleAssets(assetStale, resolvedScope, projectRoot);
+  }
+
+  try { _writeToolsShim(projectRoot); } catch (err) {
+    console.error(yellow + '  [shim] np-tools shim skipped: ' + (err && err.message) + reset);
   }
 
   if (initConfig && initConfig.mcp && !dryRun) {

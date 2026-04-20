@@ -1,6 +1,6 @@
 ---
 command: np:stats
-description: Stats output — phases-table (name/plans/completed/status/%) + metrics aggregation (tokens-in/out per phase, avg duration by tier, retry_count_sum, error_rate). Consumes node np-tools.cjs stats json. Null-token runtimes render as `—` (Phase 9 D-09). Read-only — no commits, no STATE mutation.
+description: Stats output — phases-table (name/plans/completed/status/%) + metrics aggregation (tokens-in/out per phase, avg duration by tier, retry_count_sum, error_rate). Consumes node .nubos-pilot/bin/np-tools.cjs stats json. Null-token runtimes render as `—` (Phase 9 D-09). Read-only — no commits, no STATE mutation.
 argument-hint: [json]
 ---
 
@@ -23,7 +23,7 @@ metrics record. Pitfall 9 / `workflow-missing-metrics` is exempt.
 ## Initialize
 
 ```bash
-STATS_JSON=$(node np-tools.cjs stats json)
+STATS_JSON=$(node .nubos-pilot/bin/np-tools.cjs stats json)
 if [[ -z "$STATS_JSON" ]]; then
   echo "No stats available (empty project?)" >&2
   exit 0
@@ -115,7 +115,7 @@ and is rendered by the agent CLI.
 
 <scope_guardrail>
 **Do:**
-- Consume `node np-tools.cjs stats json` — trust its
+- Consume `node .nubos-pilot/bin/np-tools.cjs stats json` — trust its
   `schema_version: 1` output shape (Plan 10-01-T04 contract).
 - Render `tokens_in` / `tokens_out` as `—` when null (Phase 9 D-09
   non-claude runtimes; D-15 hybrid-output decision).
@@ -131,7 +131,7 @@ and is rendered by the agent CLI.
 - Add a git commit — there is nothing to commit.
 - Invoke host-specific prompt tools directly (the BARE_ASKUSER lint
   in `bin/check-workflows.cjs` blocks them) — route through
-  `node np-tools.cjs askuser --json '…'` if prompts are ever added.
+  `node .nubos-pilot/bin/np-tools.cjs askuser --json '…'` if prompts are ever added.
 - Add a `metrics record` block. No Task/Spawn site; Pitfall 9 /
   `workflow-missing-metrics` is exempt.
 </scope_guardrail>
@@ -144,7 +144,7 @@ and is rendered by the agent CLI.
 
 ## Success Criteria
 
-- [ ] Data sourced exclusively from `node np-tools.cjs stats json`
+- [ ] Data sourced exclusively from `node .nubos-pilot/bin/np-tools.cjs stats json`
       (Plan 10-01-T04) — no inline JSONL parsing.
 - [ ] Null `tokens_in` / `tokens_out` render as `—` (D-09 / D-15).
 - [ ] Progress bar is a 20-char block-string (ADR-0002).

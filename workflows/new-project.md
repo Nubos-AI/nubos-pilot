@@ -106,16 +106,16 @@ Use the scan to propose:
 The 5 structural questions. All prompts go through the askuser gateway.
 
 ```bash
-INIT=$(node np-tools.cjs init new-project)
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init new-project)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
 ```bash
-ANS_PROJECT_NAME=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Project name?"}')
-ANS_CORE_VALUE=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Core value — one sentence that must stay true if everything else fails?"}')
-ANS_CONSTRAINTS=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Primary constraints (comma-separated)?"}')
-ANS_FIRST_MS=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"First milestone name?"}')
-ANS_FIRST_PHASE=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"First phase name?"}')
+ANS_PROJECT_NAME=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"Project name?"}')
+ANS_CORE_VALUE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"Core value — one sentence that must stay true if everything else fails?"}')
+ANS_CONSTRAINTS=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"Primary constraints (comma-separated)?"}')
+ANS_FIRST_MS=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"First milestone name?"}')
+ANS_FIRST_PHASE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"First phase name?"}')
 ```
 
 When Phase 0 produced a suggestion, include it as the prompt default in
@@ -143,7 +143,7 @@ node -e '
   ANS_CONSTRAINTS="$ANS_CONSTRAINTS" ANS_FIRST_MS="$ANS_FIRST_MS" \
   ANS_FIRST_PHASE="$ANS_FIRST_PHASE"
 
-node np-tools.cjs init new-project --apply "$ANSWERS"
+node .nubos-pilot/bin/np-tools.cjs init new-project --apply "$ANSWERS"
 ```
 
 The six discovery-related PROJECT.md fields (`project_description`,
@@ -155,12 +155,12 @@ The six discovery-related PROJECT.md fields (`project_description`,
 
 ```bash
 set +e
-node np-tools.cjs init new-project --apply "$ANSWERS"
+node .nubos-pilot/bin/np-tools.cjs init new-project --apply "$ANSWERS"
 APPLY_STATUS=$?
 set -e
 
 if [ "$APPLY_STATUS" -ne 0 ]; then
-  CHOICE=$(node np-tools.cjs askuser --json '{
+  CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "prompt": "Project already initialized. Choose:",
     "options": [
@@ -171,7 +171,7 @@ if [ "$APPLY_STATUS" -ne 0 ]; then
   case "$CHOICE" in
     *destructive*|*Delete*)
       rm -rf ./.nubos-pilot
-      node np-tools.cjs init new-project --apply "$ANSWERS"
+      node .nubos-pilot/bin/np-tools.cjs init new-project --apply "$ANSWERS"
       ;;
     *)
       exit 1
@@ -208,7 +208,7 @@ If Phase 0 reported `file_count > 0` with code files (not only manifests
 and docs), offer to run the initial scan now:
 
 ```bash
-RUN_SCAN=$(node np-tools.cjs askuser --json '{
+RUN_SCAN=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "confirm",
   "prompt": "Run initial codebase scan now (np:scan-codebase)?",
   "default": true
@@ -224,7 +224,7 @@ Empty workspaces skip this cleanly.
 ## Optional Commit
 
 ```bash
-if [ "$(node np-tools.cjs config-get workflow.commit_docs 2>/dev/null)" = "true" ]; then
+if [ "$(node .nubos-pilot/bin/np-tools.cjs config-get workflow.commit_docs 2>/dev/null)" = "true" ]; then
   git add .nubos-pilot/
   git commit -m "chore: np:new-project scaffold + discovery"
 fi

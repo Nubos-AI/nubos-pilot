@@ -13,7 +13,7 @@ on each accordingly.
 ## Initialize
 
 ```bash
-INIT=$(node np-tools.cjs init resume-work)
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init resume-work)
 STATUS=$(echo "$INIT" | node -e "process.stdin.on('data', d => console.log(JSON.parse(d).status))")
 ```
 
@@ -29,7 +29,7 @@ STATE.current_task matches an in-progress checkpoint. Spawn
 if [ "$STATUS" = "resume" ]; then
   TASK_ID=$(echo "$INIT" | node -e "process.stdin.on('data', d => console.log(JSON.parse(d).task_id))")
   # Hand the task payload + checkpoint to agents/np-executor.md; on completion
-  # the agent invokes `node np-tools.cjs commit-task "$TASK_ID"` as usual.
+  # the agent invokes `node .nubos-pilot/bin/np-tools.cjs commit-task "$TASK_ID"` as usual.
   echo "Resuming task $TASK_ID via agents/np-executor.md …"
 fi
 ```
@@ -40,7 +40,7 @@ Checkpoints exist but none match `STATE.current_task`:
 
 ```bash
 if [ "$STATUS" = "orphan" ]; then
-  CHOICE=$(node np-tools.cjs askuser --json '{
+  CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "header": "Verwaiste Checkpoints",
     "question": "Es existieren Checkpoint-Dateien, aber STATE.current_task passt nicht. Wie vorgehen?",

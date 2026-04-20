@@ -62,7 +62,7 @@ When `--repromote` is set, skip every gate and the verification loop. Read every
 
 ```bash
 if [[ "$REPROMOTE_FLAG" == "1" ]]; then
-  SCAFFOLD_JSON=$(node np-tools.cjs init plan-milestone scaffold-all-tasks "$PHASE")
+  SCAFFOLD_JSON=$(node .nubos-pilot/bin/np-tools.cjs init plan-milestone scaffold-all-tasks "$PHASE")
   if [[ "$SCAFFOLD_JSON" == @file:* ]]; then SCAFFOLD_JSON=$(cat "${SCAFFOLD_JSON#@file:}"); fi
   echo "repromote: $SCAFFOLD_JSON" >&2
   exit 0
@@ -72,10 +72,10 @@ fi
 ### Read milestone state
 
 ```bash
-INIT=$(node np-tools.cjs init plan-milestone init "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init plan-milestone init "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_PLANNER=$(node np-tools.cjs agent-skills planner 2>/dev/null)
-AGENT_SKILLS_CHECKER=$(node np-tools.cjs agent-skills plan-checker 2>/dev/null)
+AGENT_SKILLS_PLANNER=$(node .nubos-pilot/bin/np-tools.cjs agent-skills planner 2>/dev/null)
+AGENT_SKILLS_CHECKER=$(node .nubos-pilot/bin/np-tools.cjs agent-skills plan-checker 2>/dev/null)
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
 
@@ -90,7 +90,7 @@ Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_context
 If `has_context == false`:
 
 ```bash
-CHOICE=$(node np-tools.cjs askuser --json '{
+CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "header": "Missing M'"$PHASE"'-CONTEXT.md",
   "question": "Milestone CONTEXT.md is not present. Continue?",
@@ -124,7 +124,7 @@ fi
 If any slice has a `has_plan == true`:
 
 ```bash
-CHOICE=$(node np-tools.cjs askuser --json '{
+CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "header": "Milestone already planned",
   "question": "One or more slices already have S<NNN>-PLAN.md. Overwrite?",
@@ -137,11 +137,11 @@ CHOICE=$(node np-tools.cjs askuser --json '{
 case "$CHOICE" in
   "Abort") exit 0 ;;
   "Repromote")
-    node np-tools.cjs init plan-milestone scaffold-all-tasks "$PHASE" >&2
+    node .nubos-pilot/bin/np-tools.cjs init plan-milestone scaffold-all-tasks "$PHASE" >&2
     exit 0
     ;;
   "Overwrite")
-    node np-tools.cjs init plan-milestone abort "$PHASE"
+    node .nubos-pilot/bin/np-tools.cjs init plan-milestone abort "$PHASE"
     ;;
 esac
 ```
@@ -179,13 +179,13 @@ for ITER in 1 2; do
   [ "$ITER" = "2" ] && MODE="revise"
 
   # --- Spawn planner ---
-  PLANNER_START=$(node np-tools.cjs metrics start-timestamp)
-  PLANNER_MODEL=$(node np-tools.cjs resolve-model planner --profile frontier)
+  PLANNER_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
+  PLANNER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model planner --profile frontier)
   # Spawn agent=np-planner tier=opus model=$PLANNER_MODEL mode=$MODE milestone=$PHASE
   #   milestone_dir=$milestone_dir goal=$goal requirements=$requirements
   #   prior_findings=$LAST_FINDINGS agent_skills=$AGENT_SKILLS_PLANNER
-  PLANNER_END=$(node np-tools.cjs metrics end-timestamp)
-  node np-tools.cjs metrics record \
+  PLANNER_END=$(node .nubos-pilot/bin/np-tools.cjs metrics end-timestamp)
+  node .nubos-pilot/bin/np-tools.cjs metrics record \
     --agent np-planner --tier opus --resolved-model "$PLANNER_MODEL" \
     --phase "$PHASE" --plan "${milestone_id}-plan" --task "${milestone_id}-planner-run" \
     --started "$PLANNER_START" --ended "$PLANNER_END" \
@@ -193,13 +193,13 @@ for ITER in 1 2; do
     --retry-count 0 --status ok --runtime "$RUNTIME"
 
   # --- Spawn plan-checker ---
-  CHECKER_START=$(node np-tools.cjs metrics start-timestamp)
-  CHECKER_MODEL=$(node np-tools.cjs resolve-model plan-checker --profile frontier)
+  CHECKER_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
+  CHECKER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model plan-checker --profile frontier)
   # Spawn agent=np-plan-checker tier=opus model=$CHECKER_MODEL milestone=$PHASE
   #   milestone_dir=$milestone_dir agent_skills=$AGENT_SKILLS_CHECKER
   # Checker writes YAML verdict; orchestrator converts to JSON.
-  CHECKER_END=$(node np-tools.cjs metrics end-timestamp)
-  node np-tools.cjs metrics record \
+  CHECKER_END=$(node .nubos-pilot/bin/np-tools.cjs metrics end-timestamp)
+  node .nubos-pilot/bin/np-tools.cjs metrics record \
     --agent np-plan-checker --tier opus --resolved-model "$CHECKER_MODEL" \
     --phase "$PHASE" --plan "${milestone_id}-plan" --task "${milestone_id}-planner-run" \
     --started "$CHECKER_START" --ended "$CHECKER_END" \
@@ -220,7 +220,7 @@ for ITER in 1 2; do
   LAST_FINDINGS="$VERDICT_JSON_PATH"
 
   if [ "$ITER" = "2" ]; then
-    CHOICE=$(node np-tools.cjs askuser --json '{
+    CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
       "type": "select",
       "header": "Plan-Checker Stall",
       "question": "Plan-Checker hat 2 Iterationen lang Fail gemeldet. Was tun?",
@@ -232,12 +232,12 @@ for ITER in 1 2; do
     }')
     case "$CHOICE" in
       "Abort"*)
-        node np-tools.cjs init plan-milestone abort "$PHASE"
+        node .nubos-pilot/bin/np-tools.cjs init plan-milestone abort "$PHASE"
         exit 1
         ;;
       "Plan mit Warnings"*) break ;;
       "Manuell editieren"*)
-        node np-tools.cjs askuser --json '{"type":"input","question":"Edit slice plans in your editor, then press Enter to re-check."}'
+        node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","question":"Edit slice plans in your editor, then press Enter to re-check."}'
         break
         ;;
     esac
@@ -250,7 +250,7 @@ done
 After a successful verification (or "commit-with-warnings"), scaffold every `<task>` block into its own directory + files:
 
 ```bash
-SCAFFOLD_JSON=$(node np-tools.cjs init plan-milestone scaffold-all-tasks "$PHASE")
+SCAFFOLD_JSON=$(node .nubos-pilot/bin/np-tools.cjs init plan-milestone scaffold-all-tasks "$PHASE")
 if [[ "$SCAFFOLD_JSON" == @file:* ]]; then SCAFFOLD_JSON=$(cat "${SCAFFOLD_JSON#@file:}"); fi
 echo "scaffold-all-tasks → $SCAFFOLD_JSON" >&2
 ```

@@ -7,7 +7,7 @@ argument-hint: <milestone-number>
 # /np:execute-phase
 
 <objective>
-Execute every slice of a milestone in wave order: slice S001 first (all its tasks in parallel), then S002, etc. Per task: start a checkpoint, spawn `agents/np-executor.md` (sonnet), verify, and invoke `node np-tools.cjs commit-task <task-full-id>` for the atomic commit. All git operations route through lib/git.cjs — agents NEVER call `git` directly (ADR-0004, CLAUDE.md §Git operations).
+Execute every slice of a milestone in wave order: slice S001 first (all its tasks in parallel), then S002, etc. Per task: start a checkpoint, spawn `agents/np-executor.md` (sonnet), verify, and invoke `node .nubos-pilot/bin/np-tools.cjs commit-task <task-full-id>` for the atomic commit. All git operations route through lib/git.cjs — agents NEVER call `git` directly (ADR-0004, CLAUDE.md §Git operations).
 
 **Wave semantics:** one slice == one wave. Tasks in a slice have no intra-slice deps (they're parallel-safe by planner contract). Cross-slice deps flow forward only: a task in S002 may depend on a task in S001.
 </objective>
@@ -16,9 +16,9 @@ Execute every slice of a milestone in wave order: slice S001 first (all its task
 
 ```bash
 PHASE="$1"
-INIT=$(node np-tools.cjs init execute-milestone "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init execute-milestone "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-AGENT_SKILLS_EXECUTOR=$(node np-tools.cjs agent-skills executor 2>/dev/null)
+AGENT_SKILLS_EXECUTOR=$(node .nubos-pilot/bin/np-tools.cjs agent-skills executor 2>/dev/null)
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
 
@@ -31,10 +31,10 @@ Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `waves[]` (each wi
 Detect stale checkpoints from a prior run before starting new work:
 
 ```bash
-RESUME=$(node np-tools.cjs init resume-work)
+RESUME=$(node .nubos-pilot/bin/np-tools.cjs init resume-work)
 RESUME_STATUS=$(echo "$RESUME" | node -e "process.stdin.on('data', d => console.log(JSON.parse(d).status))")
 if [ "$RESUME_STATUS" = "orphan" ]; then
-  CHOICE=$(node np-tools.cjs askuser --json '{
+  CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "header": "Verwaiste Checkpoints gefunden",
     "question": "Vor dem Milestone-Start wurden Checkpoint-Dateien ohne passenden STATE.current_task gefunden. Was tun?",
@@ -87,13 +87,13 @@ for WAVE_INDEX in 0 1 2 ...; do
   # message (multiple Agent tool use blocks in one send).
   for TASK_ID in $TASK_IDS; do
     # IN PARALLEL:
-    node np-tools.cjs checkpoint start "$TASK_ID" --phase "$PHASE" --plan "$SLICE_FULL_ID" --wave "$((WAVE_INDEX+1))"
+    node .nubos-pilot/bin/np-tools.cjs checkpoint start "$TASK_ID" --phase "$PHASE" --plan "$SLICE_FULL_ID" --wave "$((WAVE_INDEX+1))"
 
-    TASK_JSON=$(node np-tools.cjs init execute-milestone execute-task "$PHASE" "$TASK_ID")
+    TASK_JSON=$(node .nubos-pilot/bin/np-tools.cjs init execute-milestone execute-task "$PHASE" "$TASK_ID")
     if [[ "$TASK_JSON" == @file:* ]]; then TASK_JSON=$(cat "${TASK_JSON#@file:}"); fi
 
-    EXECUTOR_START=$(node np-tools.cjs metrics start-timestamp)
-    EXECUTOR_MODEL=$(node np-tools.cjs resolve-model executor --profile frontier)
+    EXECUTOR_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
+    EXECUTOR_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model executor --profile frontier)
 
     # Spawn agents/np-executor.md (tier: sonnet, model resolved as $EXECUTOR_MODEL)
     # with a <files_to_read> block containing: the task plan file, the slice
@@ -101,15 +101,15 @@ for WAVE_INDEX in 0 1 2 ...; do
     # Executor edits EXACTLY the paths in files_modified (D-04 — no scope
     # expansion), runs <verify> commands, then invokes commit-task:
 
-    node np-tools.cjs checkpoint transition "$TASK_ID" verifying
-    node np-tools.cjs checkpoint transition "$TASK_ID" pre-commit
-    node np-tools.cjs commit-task "$TASK_ID"
+    node .nubos-pilot/bin/np-tools.cjs checkpoint transition "$TASK_ID" verifying
+    node .nubos-pilot/bin/np-tools.cjs checkpoint transition "$TASK_ID" pre-commit
+    node .nubos-pilot/bin/np-tools.cjs commit-task "$TASK_ID"
     COMMIT_STATUS=$?
 
-    EXECUTOR_END=$(node np-tools.cjs metrics end-timestamp)
+    EXECUTOR_END=$(node .nubos-pilot/bin/np-tools.cjs metrics end-timestamp)
     EXECUTOR_STATUS=ok
     [ "$COMMIT_STATUS" -ne 0 ] && EXECUTOR_STATUS=error
-    node np-tools.cjs metrics record \
+    node .nubos-pilot/bin/np-tools.cjs metrics record \
       --agent np-executor --tier sonnet --resolved-model "$EXECUTOR_MODEL" \
       --phase "$PHASE" --plan "$SLICE_FULL_ID" --task "$TASK_ID" \
       --started "$EXECUTOR_START" --ended "$EXECUTOR_END" \
@@ -135,7 +135,7 @@ After every slice completes, point the operator at `/np:validate-phase $PHASE` t
 - Move to next slice **only after** every task in the current slice is committed.
 - Start one checkpoint per task before spawning the executor agent.
 - Spawn `agents/np-executor.md` once per task with only that task's `files_modified` in scope.
-- Route every commit through `node np-tools.cjs commit-task` so `assertCommittablePaths` (D-25) runs.
+- Route every commit through `node .nubos-pilot/bin/np-tools.cjs commit-task` so `assertCommittablePaths` (D-25) runs.
 - Hard-stop the wave when `commit-task` returns a non-zero exit.
 
 **Don't:**

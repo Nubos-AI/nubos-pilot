@@ -83,13 +83,71 @@ test('install-p8-03: writes GEMINI.md with Gemini-specific notice (RUN-04, D-17)
   await install.runInstall({
     cwd: root,
     mode: 'init',
+    flags: { agents: ['gemini'] },
     askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'codex', source: 'test' }),
   });
   const geminiPath = path.join(root, 'GEMINI.md');
-  assert.ok(fs.existsSync(geminiPath), 'GEMINI.md must be written on install');
+  assert.ok(fs.existsSync(geminiPath), 'GEMINI.md must be written when gemini runtime is selected');
   const gemini = fs.readFileSync(geminiPath, 'utf-8');
   assert.match(gemini, /GEMINI\.md/, 'GEMINI.md body must contain the Gemini notice');
   assert.match(gemini, /readline/i, 'GEMINI.md notice must reference readline');
+});
+
+test('install-managed-block: stale AGENTS.md from prior install is removed on claude-only re-install', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('stale-agents-md');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  fs.writeFileSync(path.join(root, 'AGENTS.md'),
+    '<!-- nubos-pilot:begin v1 -->\nold managed content\n<!-- nubos-pilot:end -->\n');
+  fs.writeFileSync(path.join(root, 'GEMINI.md'),
+    '<!-- nubos-pilot:begin v1 -->\nold managed content\n<!-- nubos-pilot:end -->\n');
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    flags: { agents: ['claude'] },
+    askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' }),
+  });
+  assert.ok(!fs.existsSync(path.join(root, 'AGENTS.md')),
+    'stale managed-only AGENTS.md must be cleaned up on claude-only install');
+  assert.ok(!fs.existsSync(path.join(root, 'GEMINI.md')),
+    'stale managed-only GEMINI.md must be cleaned up on claude-only install');
+});
+
+test('install-managed-block: user-authored AGENTS.md survives, only managed block stripped', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('user-agents-md');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  const userContent = '# Team Rules\n\n- Write tests first.\n';
+  fs.writeFileSync(path.join(root, 'AGENTS.md'),
+    userContent + '\n<!-- nubos-pilot:begin v1 -->\nold\n<!-- nubos-pilot:end -->\n');
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    flags: { agents: ['claude'] },
+    askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' }),
+  });
+  assert.ok(fs.existsSync(path.join(root, 'AGENTS.md')),
+    'AGENTS.md with user content must survive');
+  const kept = fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf-8');
+  assert.match(kept, /Team Rules/, 'user content must be preserved');
+  assert.doesNotMatch(kept, /nubos-pilot:begin/, 'managed block must be stripped');
+});
+
+test('install-managed-block: claude-only install does NOT write AGENTS.md or GEMINI.md', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('claude-only-agents');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    flags: { agents: ['claude'] },
+    askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' }),
+  });
+  assert.ok(fs.existsSync(path.join(root, 'CLAUDE.md')), 'CLAUDE.md must exist');
+  assert.ok(!fs.existsSync(path.join(root, 'AGENTS.md')),
+    'AGENTS.md must NOT be written for claude-only install');
+  assert.ok(!fs.existsSync(path.join(root, 'GEMINI.md')),
+    'GEMINI.md must NOT be written for claude-only install');
 });
 
 test('install-p8-03: writes opencode.json when absent (D-13)', async (t) => {
@@ -232,6 +290,47 @@ test('install-assets: claude install copies workflows → .claude/commands/np/ a
     'manifest must track .claude/commands/np/help.md');
   assert.ok(manifest.files['.claude/agents/np-planner.md'],
     'manifest must track .claude/agents/np-planner.md');
+});
+
+test('install-managed-block: response_language=de injects German language directive into CLAUDE.md', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('managed-lang-de');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    askUser: async (spec) => {
+      if (spec && spec.question && /language/i.test(spec.question)) {
+        return { value: 'de', source: 'test' };
+      }
+      return { value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' };
+    },
+  });
+  const claude = fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf-8');
+  assert.match(claude, /<!-- nubos-pilot:begin v1 -->/, 'managed block must be present');
+  assert.match(claude, /Sprache:\s+\*\*Deutsch/, 'German language directive must be injected when response_language=de');
+  const config = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'config.json'), 'utf-8'));
+  assert.equal(config.response_language, 'de', 'config.json must persist response_language=de');
+});
+
+test('install-assets: writes .nubos-pilot/bin/np-tools.cjs shim with abs path to package np-tools.cjs', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('assets-shim');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  writeClaudeMd(root);
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    flags: { agents: ['claude'] },
+    askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' }),
+  });
+  const shimPath = path.join(root, '.nubos-pilot', 'bin', 'np-tools.cjs');
+  assert.ok(fs.existsSync(shimPath), '.nubos-pilot/bin/np-tools.cjs shim must exist');
+  const shim = fs.readFileSync(shimPath, 'utf-8');
+  const pkgNpTools = path.resolve(__dirname, '..', '..', 'np-tools.cjs');
+  assert.ok(shim.includes(JSON.stringify(pkgNpTools)),
+    'shim must embed absolute path to package np-tools.cjs');
+  assert.match(shim, /^#!\/usr\/bin\/env node/, 'shim must be a node shebang script');
 });
 
 test('install-assets: uninstall removes installed commands, agents, and empty parent dirs', async (t) => {

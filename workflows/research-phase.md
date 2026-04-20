@@ -65,7 +65,7 @@ Before exiting, confirm:
 3. If the user declined the offline-confirm prompt, RESEARCH.md was NOT
    written (D-23) and the abort message surfaced verbatim.
 
-All confirmations route through `node np-tools.cjs askuser --json '{...}'`.
+All confirmations route through `node .nubos-pilot/bin/np-tools.cjs askuser --json '{...}'`.
 Never a bare prompt-tool invocation — Phase-3 D-03 rename rule
 enforced by `bin/check-workflows.cjs` (the guard rejects any line that
 mentions the forbidden Claude-Code prompt-tool identifier outside a
@@ -87,12 +87,12 @@ fi
 ## Step 1: Single-Call Init
 
 All phase context is gathered in one call to
-`node np-tools.cjs init research-phase <N>`. The subcommand returns a JSON
+`node .nubos-pilot/bin/np-tools.cjs init research-phase <N>`. The subcommand returns a JSON
 payload; larger payloads are written to a tmp file and referenced via
 `@file:<path>`.
 
 ```bash
-INIT=$(node np-tools.cjs init research-phase "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init research-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
 ```
@@ -146,7 +146,7 @@ than silently clobbering the existing file.
 
 ```bash
 if [[ "$HAS_RESEARCH" == "true" ]]; then
-  node np-tools.cjs askuser --json '{
+  node .nubos-pilot/bin/np-tools.cjs askuser --json '{
     "type": "select",
     "prompt": "RESEARCH.md already exists for this phase. How do you want to proceed?",
     "options": ["Overwrite", "Append-update", "Abort"]
@@ -168,7 +168,7 @@ external docs. Route the verbatim D-21 German confirm prompt through
 ```bash
 MODE=online
 if [[ "$WEBFETCH_AVAILABLE" == "false" && "$CONTEXT7_AVAILABLE" == "false" ]]; then
-  CONFIRM=$(node np-tools.cjs askuser --json '{"type":"confirm","question":"Kein Web-/Context7-Zugriff verfügbar — mit lokalen Quellen (Repo + Prior-Phase-CONTEXT.md) fortfahren?"}')
+  CONFIRM=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"confirm","question":"Kein Web-/Context7-Zugriff verfügbar — mit lokalen Quellen (Repo + Prior-Phase-CONTEXT.md) fortfahren?"}')
   if [[ "$CONFIRM" != "yes" && "$CONFIRM" != "true" ]]; then
     echo "Research aborted. Run \`np:plan-phase $PHASE --skip-research\` to proceed without research."
     exit 0
@@ -196,8 +196,8 @@ pattern). An empty `$RESEARCHER_MODEL` string signals the runtime adapter to
 omit the `model:` parameter at spawn (Phase 8 D-22 inherit-pattern).
 
 ```bash
-RESEARCHER_START=$(node np-tools.cjs metrics start-timestamp)
-RESEARCHER_MODEL=$(node np-tools.cjs resolve-model researcher --profile balanced)
+RESEARCHER_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
+RESEARCHER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model researcher --profile balanced)
 ```
 
 ```text
@@ -211,8 +211,8 @@ usage-capture — Phase 10 will enrich this via runtime-adapter support per
 RESEARCH §A5).
 
 ```bash
-RESEARCHER_END=$(node np-tools.cjs metrics end-timestamp)
-node np-tools.cjs metrics record \
+RESEARCHER_END=$(node .nubos-pilot/bin/np-tools.cjs metrics end-timestamp)
+node .nubos-pilot/bin/np-tools.cjs metrics record \
   --agent np-researcher --tier sonnet --resolved-model "$RESEARCHER_MODEL" \
   --phase "$PHASE" --plan "$PLAN_ID" --task "$TASK_ID" \
   --started "$RESEARCHER_START" --ended "$RESEARCHER_END" \
@@ -264,7 +264,7 @@ Classify the researcher's structured-return block:
   research-skipped (`--skip-research` path in `/np:plan-phase`).
 
 ```bash
-node np-tools.cjs askuser --json '{
+node .nubos-pilot/bin/np-tools.cjs askuser --json '{
   "type": "select",
   "prompt": "Research artifact written. What next?",
   "options": ["Plan phase", "Review RESEARCH.md", "Done"]

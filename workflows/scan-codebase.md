@@ -60,7 +60,7 @@ end.
 Scan, group, write manifest + stubs, emit module-facts in one call:
 
 ```bash
-PLAN=$(node np-tools.cjs scan-codebase --project-name "$PROJECT_NAME")
+PLAN=$(node .nubos-pilot/bin/np-tools.cjs scan-codebase --project-name "$PROJECT_NAME")
 if [[ "$PLAN" == @file:* ]]; then PLAN=$(cat "${PLAN#@file:}"); fi
 ```
 
@@ -110,7 +110,7 @@ chance to pause with Ctrl-C. Never eat interrupt signals.
 ### Step 3: Apply prose per module
 
 ```bash
-node np-tools.cjs scan-codebase --apply-prose \
+node .nubos-pilot/bin/np-tools.cjs scan-codebase --apply-prose \
   --module "$MODULE_ID" \
   --prose-file "$PROSE_FILE"
 ```
