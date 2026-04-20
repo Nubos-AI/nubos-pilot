@@ -194,7 +194,7 @@ async function _runInitQuestions(detectedRuntime, askUser, flags) {
     const labels = _runtimeSelectLabels();
     const detectedIdx = Math.max(0, VALID_AGENTS.indexOf(detectedRuntime || 'claude'));
     const picked = (await askUser({ type: 'multiselect',
-      question: yellow + 'Which runtime(s) would you like to install for?' + reset,
+      question: 'Which runtime(s) would you like to install for?',
       options: labels, default: [labels[detectedIdx]] })).value;
     runtimes = Array.isArray(picked) && picked.length && typeof picked[0] === 'string'
       && picked[0].includes('(')
