@@ -18,11 +18,12 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 <required_reading>
 Before reviewing, load the project's invariants:
 
-1. `CLAUDE.md` — project conventions, security requirements, coding rules
-2. `PROJECT.md` — project constraints, Core Value, Out-of-Scope items
-3. `docs/adr/*.md` — architectural decisions that must not be violated
-4. Referenced ADRs from the phase's PLAN.md `<threat_model>` block
-5. The phase's PLAN.md `requirements:` frontmatter list
+1. `.nubos-pilot/codebase/INDEX.md` + every module doc owning a file in the review set — Invariants/Gotchas here define what "wrong" means for a given module (runtime-agnostic Codebase Docs Protocol)
+2. `CLAUDE.md` — project conventions, security requirements, coding rules
+3. `PROJECT.md` — project constraints, Core Value, Out-of-Scope items
+4. `docs/adr/*.md` — architectural decisions that must not be violated
+5. Referenced ADRs from the phase's PLAN.md `<threat_model>` block
+6. The phase's PLAN.md `requirements:` frontmatter list
 
 **Project skills:** Check `.claude/skills/` or `.agents/skills/` if either exists. For each skill:
 1. Read `SKILL.md` (lightweight index ~130 lines)

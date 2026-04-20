@@ -1,26 +1,34 @@
 ---
 command: np:new-project
-description: Greenfield project scaffold — runs interactive interview, writes PROJECT.md + REQUIREMENTS.md + roadmap.yaml + first phase dir + ROADMAP.md.
+description: Greenfield project scaffold — scans existing workspace, runs bootstrap interview (5 questions), scaffolds the baseline artifacts, then chains into obligatory project discovery and initial codebase scan.
 ---
 
 # np:new-project
 
-Initialize a new project through a short interview, then scaffold the five
-baseline artifacts (`PROJECT.md`, `REQUIREMENTS.md`, `roadmap.yaml`,
-`ROADMAP.md`, `STATE.md`) plus the first phase directory with a
-`CONTEXT.md` placeholder. This is the greenfield entry point; all other
-`np:*` workflows assume a project exists.
+Initialize a new nubos-pilot project in three phases:
+
+1. **Phase 0 — Workspace Scan** (context capture)
+2. **Phase 1 — Bootstrap Interview** (5 structural questions → scaffold)
+3. **Phase 2 — Project Discovery** (obligatory, chains into `np:discuss-project --bootstrap`)
+
+Optionally runs an initial codebase scan at the end when the workspace
+contains existing source (`np:scan-codebase`). Everything lands under
+`.nubos-pilot/`; no source files are ever modified.
 
 ## Philosophy
 
 <philosophy>
-The most leveraged moment in any project is the first interview. Deep
-questioning up front means better roadmaps, better plans, and better
-executions. `np:new-project` does not try to be clever — it asks five
-specific questions whose answers hard-constrain every downstream workflow,
-writes the five files, and exits. The user can edit `PROJECT.md` and
-`REQUIREMENTS.md` any time; this workflow's job is to produce a
-well-formed scaffold, not to pretend to understand the project.
+The most leveraged moment in any project is the first interview, and the
+first interview must be grounded in what actually exists. A bare interview
+produces generic PROJECT.md stubs; a grounded one captures the specific
+project under specific constraints. This workflow therefore scans *first*,
+uses the scan to enrich the interview, and then makes the deeper
+discovery step obligatory — no more jumping into phases with a skeleton
+PROJECT.md.
+
+Runtime-agnostic throughout: scanner is deterministic Node code; interview
+uses the askuser gateway; discovery is delegated to `np:discuss-project`
+which dispatches the documenter agent through whatever host is active.
 </philosophy>
 
 ## Scope Guardrail
@@ -29,86 +37,92 @@ well-formed scaffold, not to pretend to understand the project.
 This workflow ONLY touches `.nubos-pilot/` and creates its first phase
 directory. It NEVER:
 
-- runs outside the current working directory
-- writes when `.nubos-pilot/PROJECT.md` already exists (D-28 Pitfall 8)
-- mutates files in parent directories
-- spawns agents or long-running tasks
-
-If `.nubos-pilot/PROJECT.md` already exists, the subcommand throws
-`project-already-initialized` and this workflow offers two paths: abort
-or destructively reset (user must confirm destructively).
+- modifies files outside `.nubos-pilot/`
+- writes when `.nubos-pilot/PROJECT.md` already exists (refuses with
+  `project-already-initialized`)
+- mutates application source code
+- spawns long-running tasks without user consent (batched codebase scan
+  offers pause between batches)
 </scope_guardrail>
 
 ## Downstream Awareness
 
 <downstream_awareness>
-The five files this workflow writes are consumed by:
+This workflow writes:
+- `.nubos-pilot/PROJECT.md` (section bodies later filled by discovery)
+- `.nubos-pilot/REQUIREMENTS.md` (REQ-01 placeholder)
+- `.nubos-pilot/roadmap.yaml` + `ROADMAP.md`
+- `.nubos-pilot/STATE.md`
+- `.nubos-pilot/phases/01-<slug>/01-CONTEXT.md`
+- (optional) `.nubos-pilot/codebase/` via chained `np:scan-codebase`
 
-- `np:next` (reads `.nubos-pilot/STATE.md` + `.nubos-pilot/roadmap.yaml`)
-- `np:discuss-phase` (reads `PROJECT.md` for constraints, writes
-  `phases/01-<slug>/01-CONTEXT.md` which we scaffold as placeholder)
-- `np:plan-phase` (reads `REQUIREMENTS.md` for requirement IDs)
-- `np:progress` (reads `roadmap.yaml` for totals)
-
-Downstream workflows expect `REQUIREMENTS.md` to have `REQ-*` IDs matching
-the format `**REQ-NN**`. The template seeds `REQ-01` as a TBD — the user
-is expected to edit it before running `np:plan-phase 1`.
+`np:discuss-project` (Phase 2) chains automatically — not skippable.
+`np:scan-codebase` chains when the workspace contains >= 1 source file.
 </downstream_awareness>
 
-## Single-Call Init
+## Phase 0: Workspace Scan
 
-All context — the interview question set plus metadata — comes from a
-single `np-tools.cjs init new-project` call.
+Probe the workspace for context before asking anything:
+
+```bash
+SCAN=$(node -e '
+  const { scan } = require("./lib/workspace-scan.cjs");
+  const r = scan({ cwd: process.cwd(), batchSize: 1000 });
+  process.stdout.write(JSON.stringify({
+    file_count: r.stats.file_count,
+    langs: r.language_distribution,
+    manifests: Object.keys(r.manifests),
+    docs: Object.keys(r.docs),
+    readme_head: r.docs["README.md"]
+      ? r.docs["README.md"].content.split("\\n").slice(0, 20).join("\\n")
+      : null,
+    git: r.git,
+  }));
+')
+```
+
+Show findings to the user and offer pre-filled suggestions:
+
+```
+Workspace inventory:
+- Files: <file_count>
+- Top languages: <top 3>
+- Manifests found: <list>
+- README detected: <yes/no>
+- Git repo: <yes/no, N commits>
+
+I can suggest defaults from this scan. Review and adjust.
+```
+
+Use the scan to propose:
+- `project_name` — from directory basename; edit if off
+- `primary_constraints` — derived from manifests (e.g. "Node 22" from
+  `package.json.engines.node`)
+- `core_value` — best-effort extraction from README first paragraph
+
+## Phase 1: Bootstrap Interview
+
+The 5 structural questions. All prompts go through the askuser gateway.
 
 ```bash
 INIT=$(node np-tools.cjs init new-project)
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-The payload shape:
-
-```json
-{
-  "mode": "interview",
-  "questions": [
-    { "key": "project_name", "type": "input", "question": "Project name?" },
-    { "key": "core_value", "type": "input", "question": "Core value — one sentence…" },
-    { "key": "primary_constraints", "type": "input", "question": "Primary constraints…" },
-    { "key": "first_milestone_name", "type": "input", "question": "First milestone name…" },
-    { "key": "first_phase_name", "type": "input", "question": "First phase name…" }
-  ]
-}
-```
-
-## Interview
-
-All five questions go through `np-tools.cjs askuser` (Phase 3 D-03). No
-runtime-native question tool is permitted anywhere in this file — the
-gateway subcommand is the single allowed path.
-
 ```bash
 ANS_PROJECT_NAME=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Project name?"}')
-ANS_CORE_VALUE=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Core value (1 sentence)?"}')
+ANS_CORE_VALUE=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Core value — one sentence that must stay true if everything else fails?"}')
 ANS_CONSTRAINTS=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"Primary constraints (comma-separated)?"}')
 ANS_FIRST_MS=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"First milestone name?"}')
 ANS_FIRST_PHASE=$(node np-tools.cjs askuser --json '{"type":"input","prompt":"First phase name?"}')
 ```
 
-<answer_validation>
-The subcommand slugifies `first_milestone_name` and `first_phase_name`
-and throws `invalid-slug` if either produces an empty string after
-stripping non-`[a-z0-9-]` characters. The user sees this error immediately
-and can re-run the workflow with a different answer.
+When Phase 0 produced a suggestion, include it as the prompt default in
+the askuser call (e.g. `"prompt":"Project name? (suggested: T-AI)"`).
 
-`project_name`, `core_value`, and `primary_constraints` are stored verbatim
-inside the rendered templates — the subcommand's `render()` helper treats
-them as plain strings, so shell metacharacters, Markdown syntax, and YAML
-control chars are all inert. Task 2's NP-5 test asserts this.
-</answer_validation>
+## Apply scaffold
 
-## Apply
-
-Write the five answers to a tmp JSON file and feed it to the subcommand.
+Write the five answers to a tmp JSON file and call the subcommand:
 
 ```bash
 ANSWERS=$(mktemp -t np-new-project-answers.XXXXXX)
@@ -116,29 +130,27 @@ trap 'rm -f "$ANSWERS"' EXIT
 
 node -e '
   const fs = require("fs");
-  const payload = {
+  fs.writeFileSync(process.env.ANSWERS, JSON.stringify({
     project_name: process.env.ANS_PROJECT_NAME,
     core_value: process.env.ANS_CORE_VALUE,
     primary_constraints: process.env.ANS_CONSTRAINTS,
     first_milestone_name: process.env.ANS_FIRST_MS,
     first_phase_name: process.env.ANS_FIRST_PHASE,
-  };
-  fs.writeFileSync(process.env.ANSWERS, JSON.stringify(payload));
-' ANS_PROJECT_NAME="$ANS_PROJECT_NAME" ANS_CORE_VALUE="$ANS_CORE_VALUE" ANS_CONSTRAINTS="$ANS_CONSTRAINTS" ANS_FIRST_MS="$ANS_FIRST_MS" ANS_FIRST_PHASE="$ANS_FIRST_PHASE" ANSWERS="$ANSWERS"
+  }));
+' ANSWERS="$ANSWERS" \
+  ANS_PROJECT_NAME="$ANS_PROJECT_NAME" ANS_CORE_VALUE="$ANS_CORE_VALUE" \
+  ANS_CONSTRAINTS="$ANS_CONSTRAINTS" ANS_FIRST_MS="$ANS_FIRST_MS" \
+  ANS_FIRST_PHASE="$ANS_FIRST_PHASE"
 
 node np-tools.cjs init new-project --apply "$ANSWERS"
 ```
 
-We pass the answers via env → `node -e` → JSON file to keep shell
-metacharacters inert (no heredoc interpolation). The subcommand emits
-`{mode:"apply", milestoneId, firstPhaseNumber, firstPhaseSlug, created: [...]}`
-on success.
+The six discovery-related PROJECT.md fields (`project_description`,
+`domain_text`, `target_users_text`, `non_goals_text`,
+`success_criteria_text`, `strategic_decisions_text`) are written as
+`_TBD — filled by /np:discuss-project._` placeholders. Phase 2 fills them.
 
 ## Re-Init Guard
-
-When `PROJECT.md` already exists, the subcommand throws
-`project-already-initialized`. The workflow catches it and offers a
-decision:
 
 ```bash
 set +e
@@ -167,38 +179,75 @@ if [ "$APPLY_STATUS" -ne 0 ]; then
 fi
 ```
 
-Default on ambiguity: abort. This workflow never deletes `.nubos-pilot/`
-without an explicit `select` answer containing `Delete`.
+## Phase 2: Project Discovery (obligatory)
+
+Do not let the user skip this. Chain into `np:discuss-project --bootstrap`:
+
+```bash
+BOOTSTRAP=1 /np:discuss-project
+```
+
+The user answers the six adaptive discovery questions (Target Users,
+Domain, What-This-Is, Non-Goals, Success Criteria, Strategic Decisions),
+reviews proposed requirements, and ends with a fully populated PROJECT.md.
+
+If the user tries to exit mid-discovery, warn:
+
+```
+PROJECT.md still has _TBD placeholders. Downstream phases will treat
+the project as under-specified. Continue discovery? (yes / no, I will
+finish later)
+```
+
+Record the skip in STATE.md so the next `np:next` reminds the user.
+
+## Phase 3 (conditional): Initial Codebase Scan
+
+If Phase 0 reported `file_count > 0` with code files (not only manifests
+and docs), offer to run the initial scan now:
+
+```bash
+RUN_SCAN=$(node np-tools.cjs askuser --json '{
+  "type": "confirm",
+  "prompt": "Run initial codebase scan now (np:scan-codebase)?",
+  "default": true
+}')
+
+if [[ "$RUN_SCAN" == "true" ]]; then
+  /np:scan-codebase
+fi
+```
+
+Empty workspaces skip this cleanly.
 
 ## Optional Commit
-
-When `config.commit_docs` is true, commit the scaffold. Use `execFileSync`
-arg arrays (no shell-string concatenation) — see Phase 3 D-03 docs.
 
 ```bash
 if [ "$(node np-tools.cjs config-get workflow.commit_docs 2>/dev/null)" = "true" ]; then
   git add .nubos-pilot/
-  git commit -m "chore: np:new-project scaffold"
+  git commit -m "chore: np:new-project scaffold + discovery"
 fi
 ```
 
 ## Output
 
-On success, print a summary block and point the user at `np:next`:
-
 ```
 np:new-project complete.
 
 Created:
-  .nubos-pilot/PROJECT.md
+  .nubos-pilot/PROJECT.md             (populated by discovery)
   .nubos-pilot/REQUIREMENTS.md
   .nubos-pilot/roadmap.yaml
   .nubos-pilot/ROADMAP.md
   .nubos-pilot/STATE.md
   .nubos-pilot/phases/01-<slug>/01-CONTEXT.md
+  .nubos-pilot/codebase/               (if initial scan ran)
 
-Next: run `np:next` to resume, or edit REQUIREMENTS.md before discussing
-the first phase with `np:discuss-phase 1`.
+Milestone: <milestoneId> · Phase 1: <firstPhaseSlug>
+
+Next:
+  - /np:discuss-phase 1 to scope the first phase
+  - /np:update-docs after any code change (agents will do this automatically)
 ```
 
 ## Errors
@@ -208,6 +257,4 @@ the first phase with `np:discuss-phase 1`.
 | `project-already-initialized` | `PROJECT.md` exists | Abort or re-run with destructive option |
 | `invalid-slug` | milestone/phase name has no `[a-z0-9]` content | Re-run with a different name |
 | `answers-missing-field` | empty answer | Re-run and fill all 5 fields |
-
-All errors propagate from the subcommand as `NubosPilotError` with a
-stable `code` — workflow consumers can script against them.
+| `discuss-project-bootstrap-requires-project` | Discovery invoked before scaffold | Restart workflow |

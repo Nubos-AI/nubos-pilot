@@ -8,6 +8,8 @@ const { NubosPilotError, atomicWriteFileSync } = require('../../lib/core.cjs');
 const manifestMod = require('../../lib/install/manifest.cjs');
 const codexTomlMod = require('../../lib/install/codex-toml.cjs');
 const askuserMod = require('../../lib/askuser.cjs');
+const codebaseManifest = require('../../lib/codebase-manifest.cjs');
+const { scan: workspaceScan } = require('../../lib/workspace-scan.cjs');
 
 const PAYLOAD_SUBPATH = path.join('.claude', 'nubos-pilot');
 const CODEX_CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
@@ -147,6 +149,100 @@ function _checkAskUserBroken() {
   }
 }
 
+function _checkCodebaseDocs(projectRoot) {
+  const issues = [];
+  const stateDir = path.join(projectRoot, '.nubos-pilot');
+  if (!fs.existsSync(stateDir)) return issues;
+  const codebaseDir = path.join(stateDir, 'codebase');
+  const indexPath = path.join(codebaseDir, 'INDEX.md');
+  const modulesDir = path.join(codebaseDir, 'modules');
+
+  if (!fs.existsSync(indexPath)) {
+    issues.push({
+      id: 'codebase-not-scanned',
+      severity: 'warn',
+      fixable: 'run-workflow',
+      details: { hint: 'run `np:scan-codebase`' },
+    });
+    return issues;
+  }
+
+  let prevManifest;
+  try {
+    prevManifest = codebaseManifest.readManifest(projectRoot);
+  } catch (err) {
+    issues.push({
+      id: 'codebase-manifest-unreadable',
+      severity: 'warn',
+      fixable: 'run-workflow',
+      details: { cause: err && err.code, hint: 'run `np:scan-codebase`' },
+    });
+    return issues;
+  }
+
+  let scanResult;
+  try {
+    scanResult = workspaceScan({ cwd: projectRoot, batchSize: 1000 });
+  } catch (err) {
+    issues.push({
+      id: 'codebase-scan-failed',
+      severity: 'warn',
+      fixable: 'run-workflow',
+      details: { cause: err && err.code, hint: 'inspect workspace and re-run `np:scan-codebase`' },
+    });
+    return issues;
+  }
+
+  const nextManifest = codebaseManifest.manifestFromScanFiles(scanResult.files);
+  const diff = codebaseManifest.diffManifest(prevManifest, nextManifest);
+  const touched = diff.summary.added + diff.summary.changed + diff.summary.removed;
+  if (touched > 0) {
+    issues.push({
+      id: 'codebase-manifest-stale',
+      severity: 'warn',
+      fixable: 'run-workflow',
+      details: {
+        added: diff.summary.added,
+        changed: diff.summary.changed,
+        removed: diff.summary.removed,
+        hint: 'run `np:update-docs`',
+      },
+    });
+  }
+
+  if (fs.existsSync(modulesDir)) {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(modulesDir).filter((f) => f.endsWith('.md'));
+    } catch {}
+    const tbdDocs = [];
+    for (const f of entries) {
+      try {
+        const raw = fs.readFileSync(path.join(modulesDir, f), 'utf-8');
+        const purposeIdx = raw.indexOf('## Purpose');
+        if (purposeIdx >= 0) {
+          const chunk = raw.slice(purposeIdx, purposeIdx + 400);
+          if (chunk.includes('_TBD')) tbdDocs.push(f);
+        }
+      } catch {}
+    }
+    if (tbdDocs.length > 0) {
+      issues.push({
+        id: 'codebase-tbd-docs',
+        severity: 'info',
+        fixable: 'run-workflow',
+        details: {
+          count: tbdDocs.length,
+          sample: tbdDocs.slice(0, 5),
+          hint: 'run `np:scan-codebase` and dispatch the documenter agent for each module',
+        },
+      });
+    }
+  }
+
+  return issues;
+}
+
 function _audit(projectRoot) {
   const payloadDir = _payloadDirFor(projectRoot);
   const issues = [];
@@ -157,6 +253,7 @@ function _audit(projectRoot) {
   const codex = _checkCodexTrappedFeatures();
   issues.push(...codex.issues);
   issues.push(..._checkAskUserBroken());
+  issues.push(..._checkCodebaseDocs(projectRoot));
   return { issues, _codexContent: codex.content };
 }
 
@@ -201,6 +298,12 @@ async function _applyFixes(issues, codexContent, askUser, stderr) {
     if (issue.fixable === 'reinstall') {
       try { stderr.write(`[doctor] ${issue.id}: Run \`npx nubos-pilot\` to reinstall.\n`); } catch {}
       skipped.push({ id: issue.id, reason: 'requires-reinstall' });
+      continue;
+    }
+    if (issue.fixable === 'run-workflow') {
+      const hint = (issue.details && issue.details.hint) || 'run the suggested np workflow';
+      try { stderr.write(`[doctor] ${issue.id}: ${hint}.\n`); } catch {}
+      skipped.push({ id: issue.id, reason: 'requires-workflow' });
       continue;
     }
     skipped.push({ id: issue.id, reason: 'not-fixable' });

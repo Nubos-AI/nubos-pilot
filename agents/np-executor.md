@@ -30,20 +30,67 @@ The orchestrator provides these in your prompt context. Read every path it hands
 | Task file (required) | The single task you implement. Frontmatter carries `id`, `files_modified`, `tier`, `verify`. | `.planning/phases/<phase>/<phase>-<plan>/tasks/<task-id>.md` |
 | Checkpoint file (managed) | `.nubos-pilot/checkpoints/<task-id>.json` — write-through state transitions via `np-tools.cjs checkpoint transition`. Do NOT read/write directly. | `.nubos-pilot/checkpoints/<task-id>.json` |
 
+## Codebase Docs Protocol (runtime-agnostic)
+
+nubos-pilot maintains a skill-style code documentation layer at
+`.nubos-pilot/codebase/` that every dev-agent MUST consult before touching
+source and MUST refresh after writing source. Same protocol whether you
+run inside Claude Code, OpenAI, Codex, or any host.
+
+**Pre-edit (read-first) — mandatory:**
+
+1. Read `.nubos-pilot/codebase/INDEX.md`. It lists every documented module.
+2. For each file in `files_modified`, find the owning module doc in
+   `.nubos-pilot/codebase/modules/<id>.md` and read it fully.
+3. Respect the Invariants and Gotchas sections — they are constraints.
+   If your change would violate an invariant, stop and report.
+
+If `INDEX.md` does not exist, report to the orchestrator and refuse to
+proceed on raw source. The orchestrator should then run `np:scan-codebase`
+before re-spawning you.
+
+**Post-edit (write-back) — mandatory:**
+
+After `commit-task` succeeds, run:
+
+```bash
+node np-tools.cjs update-docs
+```
+
+For every module reported as stale in `update-docs`'s plan output,
+dispatch the `np-codebase-documenter` agent with the provided facts,
+capture its JSON, and call:
+
+```bash
+node np-tools.cjs update-docs --apply-prose \
+  --module "$MODULE_ID" \
+  --prose-file "$PROSE_FILE"
+```
+
+Doc refresh is a separate concern from the task commit — never lump it
+into the `task(…)` commit. If `workflow.commit_docs=true`, the
+`update-docs` workflow makes its own `docs(codebase): …` commits.
+
 ## Workflow
 
 1. **Read** the task file and PLAN.md referenced in your prompt.
-2. **Transition to in-progress:** `node np-tools.cjs checkpoint transition <task-id> in-progress`.
-3. **Edit files** — only the paths listed in the task's `files_modified` frontmatter. Use `Read` + `Edit` / `Write`. No scope expansion.
-4. **Transition to verifying:** `node np-tools.cjs checkpoint transition <task-id> verifying`.
-5. **Run the task-level verification command** from the task frontmatter's `verify`. If it fails, fix within the same `files_modified` scope. If it still fails after 2 attempts, STOP and report.
-6. **Transition to pre-commit:** `node np-tools.cjs checkpoint transition <task-id> pre-commit`.
-7. **Atomic-commit via helper:** `node np-tools.cjs commit-task <task-id>`.
+2. **Read codebase docs** — `.nubos-pilot/codebase/INDEX.md` plus every
+   module doc owning a path in `files_modified`. Pre-edit step of the
+   Codebase Docs Protocol.
+3. **Transition to in-progress:** `node np-tools.cjs checkpoint transition <task-id> in-progress`.
+4. **Edit files** — only the paths listed in the task's `files_modified` frontmatter. Use `Read` + `Edit` / `Write`. No scope expansion.
+5. **Transition to verifying:** `node np-tools.cjs checkpoint transition <task-id> verifying`.
+6. **Run the task-level verification command** from the task frontmatter's `verify`. If it fails, fix within the same `files_modified` scope. If it still fails after 2 attempts, STOP and report.
+7. **Transition to pre-commit:** `node np-tools.cjs checkpoint transition <task-id> pre-commit`.
+8. **Atomic-commit via helper:** `node np-tools.cjs commit-task <task-id>`.
    This routes through `lib/git.cjs`:
    - `assertCommittablePaths(files_modified)` — hard-fails if all paths gitignored (D-25), warns on partial (D-26).
    - `git add -- <files_modified>` + `git commit -m "task(<task-id>): <title>"`.
    The helper also deletes the checkpoint on success.
-8. Report commit hash + files touched to the orchestrator. Done.
+9. **Refresh codebase docs** — run `node np-tools.cjs update-docs` (see
+   Codebase Docs Protocol). Dispatch the documenter agent for each stale
+   module, apply prose. This step is separate from the task commit.
+10. Report commit hash + files touched to the orchestrator. Done.
 
 <scope_guardrail>
 **Do:**

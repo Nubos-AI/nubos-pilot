@@ -9,6 +9,8 @@ This directory contains MADR-full ADRs that codify scope invariants of nubos-pil
 - [`0003-max-six-unit-types.md`](0003-max-six-unit-types.md) — Milestone, Phase, Plan, Task, Todo, Backlog — no more (FND-03)
 - [`0004-atomic-commit-per-unit.md`](0004-atomic-commit-per-unit.md) — Every unit-completion = exactly one git commit (FND-04)
 - [`0005-three-orthogonal-file-trees.md`](0005-three-orthogonal-file-trees.md) — Source / Install-Payload / Project-State stay disjoint (FND-05)
+- [`0006-yaml-dependency-amendment.md`](0006-yaml-dependency-amendment.md) — Accept `yaml@^2.8` as first runtime dep (amends ADR-0002)
+- [`0007-codebase-docs-layer.md`](0007-codebase-docs-layer.md) — Skill-style codebase documentation under `.nubos-pilot/codebase/` as shared agent memory
 
 ## Status Lifecycle
 

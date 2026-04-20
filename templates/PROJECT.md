@@ -1,4 +1,4 @@
-<!-- Placeholders: core_value, created_date, first_milestone_name, first_phase_name, primary_constraints, project_name -->
+<!-- Placeholders: core_value, created_date, domain_text, first_milestone_name, first_phase_name, non_goals_text, primary_constraints, project_description, project_name, strategic_decisions_text, success_criteria_text, target_users_text -->
 # {{project_name}}
 
 ## Project
@@ -7,9 +7,15 @@
 
 ## What This Is
 
-{{project_name}} is an early-stage project. Update this section after the first
-phase ships with a concrete 2-3 sentence description of what the product does
-and who it serves. Use the user's language and framing.
+{{project_description}}
+
+## Domain
+
+{{domain_text}}
+
+## Target Users
+
+{{target_users_text}}
 
 ## Core Value
 
@@ -17,6 +23,18 @@ and who it serves. Use the user's language and framing.
 
 If everything else fails, this one sentence must remain true. It drives
 prioritization when tradeoffs arise.
+
+## Non-Goals
+
+{{non_goals_text}}
+
+## Success Criteria
+
+{{success_criteria_text}}
+
+## Strategic Decisions
+
+{{strategic_decisions_text}}
 
 ## Constraints
 
@@ -54,6 +72,10 @@ PROJECT.md evolves throughout the project lifecycle.
 1. Full review of all sections
 2. Core Value check — still the right priority?
 3. Update Current Focus with next milestone/phase
+
+**When scope or positioning shifts:**
+- Run `np:discuss-project` to refresh Domain, Target Users, Non-Goals,
+  Success Criteria, and Strategic Decisions without starting over.
 
 ---
 *Created: {{created_date}}*

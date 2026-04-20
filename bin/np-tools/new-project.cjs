@@ -153,6 +153,12 @@ function _apply(answersPath, cwd, stdout) {
     first_milestone_name: answers.first_milestone_name,
     first_phase_name: answers.first_phase_name,
     created_date: createdDate,
+    project_description: '_TBD — filled by `/np:discuss-project`._',
+    domain_text: '_TBD — filled by `/np:discuss-project`._',
+    target_users_text: '_TBD — filled by `/np:discuss-project`._',
+    non_goals_text: '_TBD — filled by `/np:discuss-project`._',
+    success_criteria_text: '_TBD — filled by `/np:discuss-project`._',
+    strategic_decisions_text: '_TBD — filled by `/np:discuss-project`._',
   };
   atomicWriteFileSync(projectMd, _render(_loadTemplate('PROJECT'), projectVars, 'PROJECT'));
 

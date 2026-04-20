@@ -20,10 +20,11 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 <required_reading>
 Before fixing, load:
 
-1. `{phase_dir}/{padded}-REVIEW.md` — the source-of-truth findings list (agent-owned frontmatter produced by `np-code-reviewer`)
-2. `CLAUDE.md` — project conventions, security requirements, coding rules
-3. `PROJECT.md` — project constraints, Core Value, Out-of-Scope items
-4. `docs/adr/*.md` — architectural decisions that must not be violated while fixing
+1. `.nubos-pilot/codebase/INDEX.md` — codebase module map (MANDATORY; see Codebase Docs Protocol below). For every source file you are about to touch, follow the INDEX to the owning `.nubos-pilot/codebase/modules/<id>.md` and read its Invariants + Gotchas sections in full.
+2. `{phase_dir}/{padded}-REVIEW.md` — the source-of-truth findings list (agent-owned frontmatter produced by `np-code-reviewer`)
+3. `CLAUDE.md` — project conventions, security requirements, coding rules
+4. `PROJECT.md` — project constraints, Core Value, Out-of-Scope items
+5. `docs/adr/*.md` — architectural decisions that must not be violated while fixing
 
 **Project skills:** Check `.claude/skills/` or `.agents/skills/` if either exists:
 1. Read `SKILL.md` (lightweight index)
@@ -31,6 +32,23 @@ Before fixing, load:
 3. Do NOT load full `AGENTS.md` files
 4. Follow skill rules relevant to your fix tasks
 </required_reading>
+
+## Codebase Docs Protocol (runtime-agnostic)
+
+**Pre-fix (read-first) — mandatory:** Read `.nubos-pilot/codebase/INDEX.md`
+and every module doc owning a file you are about to edit. Respect
+Invariants and Gotchas — violation = stop and report, not proceed.
+
+**Post-fix (write-back) — mandatory:** After each successful `fix(...)`
+commit, run `node np-tools.cjs update-docs`. For every stale module in
+its plan output, dispatch the `np-codebase-documenter` agent with the
+provided facts and apply prose via `update-docs --apply-prose`. Doc
+refresh stays separate from the `fix(...)` commit; if
+`workflow.commit_docs=true`, the update-docs workflow emits its own
+`docs(codebase): …` commits.
+
+If `.nubos-pilot/codebase/INDEX.md` is absent, report to the orchestrator
+and stop — `np:scan-codebase` must run before source edits are safe.
 
 <input>
 - `files_to_read[]`: files the workflow explicitly requested you read (REVIEW.md + any source files flagged in findings)

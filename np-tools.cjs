@@ -15,6 +15,7 @@ const initWorkflows = {
   'discuss-phase-power': require('./bin/np-tools/discuss-phase-power.cjs'),
   'research-phase':      require('./bin/np-tools/research-phase.cjs'),
   'new-project':         require('./bin/np-tools/new-project.cjs'),
+  'discuss-project':     require('./bin/np-tools/discuss-project.cjs'),
   'new-milestone':       require('./bin/np-tools/new-milestone.cjs'),
   'plan-milestone-gaps': require('./bin/np-tools/plan-milestone-gaps.cjs'),
 
@@ -52,6 +53,8 @@ const topLevelCommands = {
   'commit':         require('./bin/np-tools/commit.cjs'),
   'config-get':     require('./bin/np-tools/config.cjs'),
   'dispatch':       require('./bin/np-tools/dispatch.cjs'),
+  'scan-codebase':  require('./bin/np-tools/scan-codebase.cjs'),
+  'update-docs':    require('./bin/np-tools/update-docs.cjs'),
   'doctor':         require('./bin/np-tools/doctor.cjs'),
   'generate-slug':  require('./bin/np-tools/slug.cjs'),
   'metrics':        require('./bin/np-tools/metrics.cjs'),
