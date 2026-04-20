@@ -14,6 +14,7 @@ const {
 const layout = require('../../lib/layout.cjs');
 const { getPhase } = require('../../lib/roadmap.cjs');
 const { getAgentSkills } = require('../../lib/agents.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 
@@ -104,6 +105,8 @@ function _initPayload(mNum, cwd) {
     };
   });
 
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
+
   return {
     _workflow: 'plan-milestone',
     milestone: mNum,
@@ -122,6 +125,8 @@ function _initPayload(mNum, cwd) {
     existing_slices: sliceStatus,
     planner_tier: 'opus',
     checker_tier: 'opus',
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
     agent_skills: {
       'np-planner': _safeSkills('np-planner', cwd),
       'np-plan-checker': _safeSkills('np-plan-checker', cwd),

@@ -13,6 +13,7 @@ const layout = require('../../lib/layout.cjs');
 const { getPhase } = require('../../lib/roadmap.cjs');
 const { extractFrontmatter } = require('../../lib/frontmatter.cjs');
 const { getAgentSkills } = require('../../lib/agents.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 
@@ -119,6 +120,8 @@ function _initPayload(mNum, cwd) {
       tasks,
     });
   }
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
+
   return {
     _workflow: 'execute-milestone',
     milestone: mNum,
@@ -132,6 +135,8 @@ function _initPayload(mNum, cwd) {
     total_tasks: totalTasks,
     slice_count: slices.length,
     executor_tier: 'sonnet',
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
     agent_skills: { executor: _safeSkills('np-executor', cwd) },
   };
 }

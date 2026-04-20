@@ -52,6 +52,17 @@ into `$TEXT`. Empty text after stripping is an error — there is no
 `list` or `promote` subcommand here (deferred to a future
 capture-management plan).
 
+**Text-mode routing.** Resolve once at the start:
+
+```bash
+TEXT_MODE=$(node .nubos-pilot/bin/np-tools.cjs text-mode 2>/dev/null || echo false)
+```
+
+If `$TEXT_MODE == "true"`, skip every `np-tools.cjs askuser` call below and
+render questions as plain-text numbered lists in the main chat. Auto-enabled
+in Claude Code (CLAUDECODE=1); opt-in via `.nubos-pilot/config.json` →
+`workflow.text_mode`.
+
 ## Compute Paths
 
 Scope branching is explicit (T-10-05-02 mitigation + Pitfall 10

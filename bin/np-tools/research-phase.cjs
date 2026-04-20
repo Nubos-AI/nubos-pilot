@@ -7,6 +7,7 @@ const crypto = require('node:crypto');
 
 const { NubosPilotError, projectStateDir } = require('../../lib/core.cjs');
 const layout = require('../../lib/layout.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 
@@ -107,6 +108,8 @@ function run(args, ctx) {
     };
   });
 
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
+
   const payload = {
     _workflow: 'research-phase',
     milestone: mNum,
@@ -118,6 +121,8 @@ function run(args, ctx) {
     has_research,
     slice_research: sliceResearch,
     tools_available: _toolsAvailable(),
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
     agent_skills: _agentSkills(cwd),
   };
   _emit(payload, stdout, cwd);

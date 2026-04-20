@@ -19,6 +19,7 @@ const {
   milestoneVerificationPath,
 } = require('../../lib/verify.cjs');
 const { getAgentSkills } = require('../../lib/agents.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 const _VALID_SC_STATUSES = new Set(['Pass', 'Fail', 'Defer', 'Pending']);
@@ -90,6 +91,8 @@ function _initPayload(mNum, cwd) {
     };
   });
 
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
+
   return {
     _workflow: 'verify-work',
     milestone: mNum,
@@ -101,6 +104,8 @@ function _initPayload(mNum, cwd) {
     verification_path: verificationPath,
     slice_uat: sliceUat,
     verifier_tier: 'sonnet',
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
     agent_skills: { verifier: _safeSkills('np-verifier', cwd) },
   };
 }

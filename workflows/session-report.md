@@ -56,6 +56,17 @@ sections (summary, highlights, notable events) and any askuser prompts.
 Task IDs, milestone IDs, commit SHAs, metrics keys, and file paths stay
 canonical English. Supersedes CLAUDE.md.
 
+**Text-mode routing.** Resolve once:
+
+```bash
+TEXT_MODE=$(node .nubos-pilot/bin/np-tools.cjs text-mode 2>/dev/null || echo false)
+```
+
+If `$TEXT_MODE == "true"`, skip every `np-tools.cjs askuser` call below and
+render questions as plain-text numbered lists in the main chat. Auto-enabled
+in Claude Code (CLAUDECODE=1); opt-in via `.nubos-pilot/config.json` →
+`workflow.text_mode`.
+
 The filename format is `YYYY-MM-DDTHHMM-session-report.md` (D-17 —
 4-char HHMM, no seconds, local time) so reports sort
 lexicographically by invocation order.

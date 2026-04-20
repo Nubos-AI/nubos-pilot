@@ -31,7 +31,12 @@ prompts, and pass it into the np-nyquist-auditor spawn prompt so gap-fill
 narrative follows the project language. Test IDs, file paths, and canonical
 field names stay English. Supersedes CLAUDE.md.
 
-Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `slice_uat`.
+Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `slice_uat`, `text_mode`, `text_mode_source`.
+
+**Text-mode routing.** If `text_mode == true`, skip every `np-tools.cjs askuser`
+call in this workflow and render options as plain-text numbered lists in
+the main chat. Auto-enabled in Claude Code (CLAUDECODE=1); opt-in via
+`.nubos-pilot/config.json` → `workflow.text_mode`.
 
 ```bash
 MILESTONE_ID=$(echo "$INIT" | jq -r '.milestone_id')

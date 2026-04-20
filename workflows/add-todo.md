@@ -41,11 +41,16 @@ TODO_PATH="${PENDING_DIR}/${DATE}-${SLUG}.md"
 ```
 
 Extract from init JSON: `commit_docs`, `date`, `timestamp`, `slug`,
-`todo_count`, `todos_dir_exists`, `pending_dir`, `state_path`. The
-init handler sanitises the slug through `lib/layout.cjs.slugify`
-(strips to `[a-z0-9-]` only; filename-injection mitigation) and
-validates the description length (<= 500 chars) before any filesystem
-write occurs.
+`todo_count`, `todos_dir_exists`, `pending_dir`, `state_path`,
+`text_mode`, `text_mode_source`. The init handler sanitises the slug
+through `lib/layout.cjs.slugify` (strips to `[a-z0-9-]` only;
+filename-injection mitigation) and validates the description length
+(<= 500 chars) before any filesystem write occurs.
+
+**Text-mode routing.** If `text_mode == true`, skip every `np-tools.cjs askuser`
+call below and render questions as plain-text numbered lists in the main
+chat. Auto-enabled in Claude Code (CLAUDECODE=1); opt-in via
+`.nubos-pilot/config.json` → `workflow.text_mode`.
 
 ## Create Pending Dir
 

@@ -107,6 +107,11 @@ project language. This supersedes CLAUDE.md.
 `RUNTIME` is resolved once here and reused by the metrics-record call at the
 researcher spawn site (Step 4) per D-06 workflow-writer pattern.
 
+**Text-mode routing.** If `text_mode == true` in the payload below, skip every
+`np-tools.cjs askuser` call in this workflow and render questions as
+plain-text numbered lists in the main chat. Auto-enabled in Claude Code
+(CLAUDECODE=1); opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
+
 The payload shape:
 
 ```json

@@ -62,6 +62,12 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 user-facing output, and any prose written into milestone artefacts (YAML
 keys, IDs, and identifiers stay canonical English). Supersedes CLAUDE.md.
 
+**Text-mode routing.** If INIT payload `text_mode == true`, skip every
+`np-tools.cjs askuser` call below and render each question as a plain-text
+prompt in the main chat; collect the answer inline. Auto-enabled in Claude
+Code (CLAUDECODE=1); opt-in via `.nubos-pilot/config.json` →
+`workflow.text_mode`.
+
 Payload: three questions — `milestone_name`, `milestone_goal`, `create_req_prefix` (confirm).
 
 ## Interview

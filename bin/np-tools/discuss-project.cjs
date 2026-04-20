@@ -4,6 +4,7 @@ const path = require('node:path');
 const { NubosPilotError, atomicWriteFileSync } = require('../../lib/core.cjs');
 const { scan } = require('../../lib/workspace-scan.cjs');
 const { workspaceGitInfo } = require('../../lib/git.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates');
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
@@ -98,6 +99,8 @@ function _emitPlan(projectRoot, flags, stdout) {
 
   const scanContext = _scanContextFor(projectRoot);
 
+  const tmDetail = textMode.resolveTextModeDetail(projectRoot);
+
   stdout.write(JSON.stringify({
     mode: 'plan',
     sub_mode: mode,
@@ -107,6 +110,8 @@ function _emitPlan(projectRoot, flags, stdout) {
     questions: _grayAreas(),
     required_fields: REQUIRED_FIELDS,
     requirements_md_path: path.join(projectRoot, '.nubos-pilot', 'REQUIREMENTS.md'),
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
   }, null, 2));
 }
 

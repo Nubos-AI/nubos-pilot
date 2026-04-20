@@ -24,6 +24,11 @@ askuser prompts. When spawning the np-executor to continue a checkpoint,
 pass `$LANG_DIRECTIVE` into the spawn prompt so resumed task summaries
 follow the project language. Supersedes CLAUDE.md.
 
+**Text-mode routing.** If INIT payload `text_mode == true`, skip every
+`np-tools.cjs askuser` call below and render prompts as plain-text numbered
+lists in the main chat. Auto-enabled in Claude Code (CLAUDECODE=1); opt-in
+via `.nubos-pilot/config.json` → `workflow.text_mode`.
+
 ## Execution
 
 ### status: resume

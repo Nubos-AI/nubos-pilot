@@ -3,6 +3,7 @@ const path = require('node:path');
 
 const { projectStateDir, NubosPilotError } = require('../../lib/core.cjs');
 const { slugify } = require('../../lib/layout.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const MAX_DESCRIPTION_LENGTH = 500;
 
@@ -54,6 +55,7 @@ function _buildPayload(description, cwd) {
   }
   const todos_dir_exists = fs.existsSync(todosDir);
   const state_path = path.join(stateDir, 'STATE.md');
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
   return {
     _workflow: 'add-todo',
     commit_docs: true,
@@ -66,6 +68,8 @@ function _buildPayload(description, cwd) {
     todos_dir_exists,
     todo_count,
     state_path,
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
     todos: [],
   };
 }

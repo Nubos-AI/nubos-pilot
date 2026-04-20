@@ -29,7 +29,13 @@ prose (Pass/Fail findings, root-cause notes) follows the project language.
 Test-case IDs, file paths, and stack traces stay canonical. Supersedes
 CLAUDE.md.
 
-Parse: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `success_criteria`, `draft_results`, `verification_path`, `slice_uat`, `verifier_tier`, `agent_skills`.
+Parse: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `success_criteria`, `draft_results`, `verification_path`, `slice_uat`, `verifier_tier`, `text_mode`, `text_mode_source`, `agent_skills`.
+
+**Text-mode routing.** If `text_mode == true`, skip every `np-tools.cjs askuser`
+call below (including the Pass-2 `needs_user_confirm` gate) and render the
+options as a plain-text numbered list in the main chat. Auto-enabled in
+Claude Code (CLAUDECODE=1); opt-in via `.nubos-pilot/config.json` →
+`workflow.text_mode`.
 
 ## Pass 1 — verifier agent
 

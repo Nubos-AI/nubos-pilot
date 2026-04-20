@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const { NubosPilotError, projectStateDir } = require('../../lib/core.cjs');
 const { getPhase } = require('../../lib/roadmap.cjs');
 const layout = require('../../lib/layout.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 
@@ -96,6 +97,8 @@ function run(args, ctx) {
   const has_context = fs.existsSync(contextPath);
   const has_milestone_dir = fs.existsSync(milestoneDir);
 
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
+
   const payload = {
     _workflow: 'discuss-phase',
     milestone: mNum,
@@ -109,6 +112,8 @@ function run(args, ctx) {
     requirements: Array.isArray(def.requirements) ? def.requirements : [],
     success_criteria: Array.isArray(def.success_criteria) ? def.success_criteria : [],
     mode: flags.assumptions ? 'assumptions' : 'adaptive',
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
     agent_skills: _agentSkills(),
   };
 

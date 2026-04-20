@@ -4,6 +4,7 @@ const { NubosPilotError } = require('../../lib/core.cjs');
 const { readState } = require('../../lib/state.cjs');
 const { readCheckpoint, listCheckpoints } = require('../../lib/checkpoint.cjs');
 const { TASK_ID_RE } = require('../../lib/tasks.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 function _safeReadState(cwd) {
   try { return readState(cwd); } catch { return null; }
@@ -68,6 +69,10 @@ function run(_args, ctx) {
       message: 'no active work',
     };
   }
+
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
+  payload.text_mode = tmDetail.enabled;
+  payload.text_mode_source = tmDetail.source;
 
   stdout.write(JSON.stringify(payload));
   return payload;

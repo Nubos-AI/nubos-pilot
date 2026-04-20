@@ -44,6 +44,7 @@ const COMMANDS = [
   { name: 'commit',          category: 'Utility', description: 'Atomic git commit wrapper with gitignore-guard' },
   { name: 'config-get',      category: 'Utility', description: 'Read value from .nubos-pilot/config.json by dotted key path' },
   { name: 'lang-directive',  category: 'Utility', description: 'Print workflow language directive from config.response_language (SSOT)' },
+  { name: 'text-mode',       category: 'Utility', description: 'Print whether text mode is active (config.workflow.text_mode ∨ CLAUDECODE)' },
   { name: 'generate-slug',   category: 'Utility', description: 'Slugify text via lib/layout.cjs.slugify' },
   { name: 'stats',           category: 'Utility', description: 'Aggregated project stats (roadmap + STATE + git + metrics JSON shape)' },
 

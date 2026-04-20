@@ -10,6 +10,7 @@ const {
 } = require('../../lib/core.cjs');
 const { writeState } = require('../../lib/state.cjs');
 const layout = require('../../lib/layout.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates');
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
@@ -42,9 +43,12 @@ function _todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function _interviewPayload() {
+function _interviewPayload(cwd) {
+  const tmDetail = textMode.resolveTextModeDetail(cwd);
   return {
     mode: 'interview',
+    text_mode: tmDetail.enabled,
+    text_mode_source: tmDetail.source,
     questions: [
       { key: 'project_name', type: 'input',
         question: 'Project name?' },
@@ -286,7 +290,7 @@ function run(args, ctx) {
     return;
   }
 
-  _emit(stdout, _interviewPayload());
+  _emit(stdout, _interviewPayload(cwd));
 }
 
 module.exports = { run, _interviewPayload, _slugify };

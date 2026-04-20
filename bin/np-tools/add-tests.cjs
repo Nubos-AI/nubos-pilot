@@ -5,6 +5,7 @@ const { NubosPilotError, atomicWriteFileSync, withFileLock } = require('../../li
 const { getPhase } = require('../../lib/roadmap.cjs');
 const layout = require('../../lib/layout.cjs');
 const { parseVerificationMd, milestoneVerificationPath } = require('../../lib/verify.cjs');
+const textMode = require('../../lib/text-mode.cjs');
 
 const BEGIN_MARKER = '// >>> np:add-tests begin';
 const END_MARKER = '// <<< np:add-tests end';
@@ -138,6 +139,7 @@ function run(args, ctx) {
       const mNum = _validateMilestoneArg(list[1]);
       const target = _resolveTestTarget(mNum, cwd);
       const { passes, skips, verification_path } = _loadCases(mNum, cwd);
+      const tmDetail = textMode.resolveTextModeDetail(cwd);
       const payload = {
         _workflow: 'add-tests',
         milestone: mNum,
@@ -146,6 +148,8 @@ function run(args, ctx) {
         verification_path,
         pass_cases: passes,
         skip_cases: skips,
+        text_mode: tmDetail.enabled,
+        text_mode_source: tmDetail.source,
       };
       stdout.write(JSON.stringify(payload, null, 2));
       return payload;

@@ -30,7 +30,13 @@ into every np-executor spawn prompt as a system-level rule so task summaries
 and checkpoint notes follow the project language. This supersedes any
 directive in CLAUDE.md managed block.
 
-Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `waves[]` (each with `wave` (= slice number), `slice_id`, `slice_full_id`, `slice_dir`, `tasks[]`), `total_tasks`, `slice_count`, `executor_tier`, `agent_skills`.
+Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `waves[]` (each with `wave` (= slice number), `slice_id`, `slice_full_id`, `slice_dir`, `tasks[]`), `total_tasks`, `slice_count`, `executor_tier`, `text_mode`, `text_mode_source`, `agent_skills`.
+
+**Text-mode routing.** If `text_mode == true`, skip every `np-tools.cjs askuser`
+call below (including the orphan-checkpoint and empty-milestone prompts)
+and render the options as a plain-text numbered list in the main chat.
+Auto-enabled in Claude Code (CLAUDECODE=1); opt-in via
+`.nubos-pilot/config.json` → `workflow.text_mode`.
 
 `PLAN_ID` is iterated per slice as `${milestone_id}-${slice_id}` (e.g. `M001-S001`). `TASK_ID` is iterated from each slice's `tasks[]` (e.g. `M001-S001-T0001`).
 

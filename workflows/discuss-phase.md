@@ -32,7 +32,24 @@ conflict — the config is the single source of truth.
 
 Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`,
 `milestone_context_path`, `has_context`, `has_milestone_dir`, `goal`,
-`requirements`, `agent_skills`, `mode`.
+`requirements`, `agent_skills`, `mode`, `text_mode`, `text_mode_source`.
+
+**Text-mode routing (SSOT = INIT payload).** If `text_mode` is `true`, do
+**not** shell out to `np-tools.cjs askuser` for any prompt in this workflow.
+Present every question inline as a plain-text numbered list and wait for the
+user's reply in the main chat. This is the correct path whenever:
+
+- `text_mode_source == "runtime"` → Claude Code Bash has no TTY and cannot
+  forward interactive menu selections; the askuser marker-block protocol
+  never completes.
+- `text_mode_source == "config"` → the user explicitly opted into text mode
+  via `.nubos-pilot/config.json` → `workflow.text_mode`.
+
+When text mode is active, skip every `node .nubos-pilot/bin/np-tools.cjs
+askuser …` block below and substitute the plain-text equivalent. Collect the
+answers from the user's reply, then proceed to the next step as normal. The
+rest of the workflow (validation, canonical-ref accumulation, template
+render, commit) is unchanged.
 
 If the user passed `--assumptions`, route to
 `workflows/discuss-phase-assumptions.md` and exit this workflow.
@@ -125,30 +142,33 @@ Capture the idea in a "Deferred Ideas" section. Don't lose it, don't act on it.
 ## Answer Validation
 
 <answer_validation>
-**IMPORTANT: Answer validation** — After every interactive prompt, check the
-exit code and the response:
+**Routing decision (made once at Initialize):** If INIT payload
+`text_mode == true`, skip every `np-tools.cjs askuser` call in this workflow
+and use plain-text numbered lists in the main chat instead. The
+`text_mode_source` field (`runtime` / `config` / `default`) tells you why
+text mode is active — it is informational only and does not change behavior.
+
+**When text_mode is false and askuser is used — per-prompt validation:**
 1. If `askuser` exits with structured error `askuser-no-tty` (exit code 1,
-   stderr JSON with `"code":"askuser-no-tty"`), **skip retry** and fall back
-   immediately to the plain-text numbered list described below — the runtime
-   cannot prompt interactively in this session.
+   stderr JSON with `"code":"askuser-no-tty"`), that means the runtime
+   detection missed something; **skip retry** and treat the remainder of the
+   workflow as text-mode (plain-text numbered lists).
 2. If the response is empty or whitespace-only (exit 0 but no value), retry
    the question once with the same parameters.
 3. If still empty, present the options as a plain-text numbered list and ask
    the user to type their choice number.
 Never proceed with an empty answer.
 
-**Text mode (`workflow.text_mode: true` in config or `--text` flag):**
-When text mode is active, **do not use `np-tools.cjs askuser` at all**.
-Instead, present every question as a plain-text numbered list and ask the
-user to type their choice number. This is required for Claude Code remote
-sessions (`/rc` mode) where the Claude App cannot forward TUI menu selections
-back to the host.
+**Enable text mode:**
+- Auto-detected: any Claude Code session (`CLAUDECODE=1` /
+  `CLAUDE_CODE_ENTRYPOINT` set) — default behavior, no user action needed.
+- Opt-in per project: set `workflow.text_mode: true` in
+  `.nubos-pilot/config.json`.
+- Opt-out per project: set `workflow.text_mode: false` in
+  `.nubos-pilot/config.json` (overrides runtime detection).
 
-Enable text mode:
-- Per-session: pass `--text` flag
-- Per-project: `np-tools.cjs config-set workflow.text_mode true`
-
-Text mode applies to ALL workflows in the session, not just discuss-phase.
+Text mode applies to ALL workflows that emit `text_mode` in their INIT
+payload, not just discuss-phase.
 </answer_validation>
 
 ## Process

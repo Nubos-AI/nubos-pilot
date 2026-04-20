@@ -7,6 +7,20 @@ const { makeSandbox, seedRoadmapYaml, cleanupAll } =
   require('../../tests/helpers/fixture.cjs');
 const subcmd = require('./discuss-phase.cjs');
 
+function _clearClaudeEnv() {
+  const saved = {};
+  for (const k of ['CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT']) {
+    saved[k] = process.env[k];
+    delete process.env[k];
+  }
+  return () => {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  };
+}
+
 function _baseRoadmap() {
   return {
     schema_version: 1,
@@ -42,24 +56,67 @@ function _captureStdout() {
 afterEach(cleanupAll);
 
 test('DP-1: run(["3"]) on valid milestone returns JSON payload with expected shape', () => {
-  const sandbox = makeSandbox();
-  seedRoadmapYaml(sandbox, _baseRoadmap());
-  const cap = _captureStdout();
-  subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
-  const raw = cap.get().trim();
-  assert.ok(!raw.startsWith('@file:'));
-  const payload = JSON.parse(raw);
-  assert.equal(payload.milestone, 3);
-  assert.equal(payload.milestone_id, 'M003');
-  assert.ok(payload.milestone_dir.endsWith(path.join('.nubos-pilot', 'milestones', 'M003')));
-  assert.ok(payload.milestone_context_path.endsWith(path.join('M003', 'M003-CONTEXT.md')));
-  assert.equal(payload.milestone_name, 'Observability');
-  assert.equal(payload.has_context, false);
-  assert.equal(payload.has_milestone_dir, false);
-  assert.equal(payload.goal, 'Ship structured logging + metrics');
-  assert.deepEqual(payload.requirements, ['OBS-01']);
-  assert.ok('agent_skills' in payload);
-  assert.equal(payload.mode, 'adaptive');
+  const restore = _clearClaudeEnv();
+  try {
+    const sandbox = makeSandbox();
+    seedRoadmapYaml(sandbox, _baseRoadmap());
+    const cap = _captureStdout();
+    subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
+    const raw = cap.get().trim();
+    assert.ok(!raw.startsWith('@file:'));
+    const payload = JSON.parse(raw);
+    assert.equal(payload.milestone, 3);
+    assert.equal(payload.milestone_id, 'M003');
+    assert.ok(payload.milestone_dir.endsWith(path.join('.nubos-pilot', 'milestones', 'M003')));
+    assert.ok(payload.milestone_context_path.endsWith(path.join('M003', 'M003-CONTEXT.md')));
+    assert.equal(payload.milestone_name, 'Observability');
+    assert.equal(payload.has_context, false);
+    assert.equal(payload.has_milestone_dir, false);
+    assert.equal(payload.goal, 'Ship structured logging + metrics');
+    assert.deepEqual(payload.requirements, ['OBS-01']);
+    assert.ok('agent_skills' in payload);
+    assert.equal(payload.mode, 'adaptive');
+    assert.equal(payload.text_mode, false);
+    assert.equal(payload.text_mode_source, 'default');
+  } finally {
+    restore();
+  }
+});
+
+test('DP-1b: CLAUDECODE=1 sets text_mode=true with runtime source', () => {
+  const restore = _clearClaudeEnv();
+  try {
+    process.env.CLAUDECODE = '1';
+    const sandbox = makeSandbox();
+    seedRoadmapYaml(sandbox, _baseRoadmap());
+    const cap = _captureStdout();
+    subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
+    const payload = JSON.parse(cap.get().trim());
+    assert.equal(payload.text_mode, true);
+    assert.equal(payload.text_mode_source, 'runtime');
+  } finally {
+    restore();
+  }
+});
+
+test('DP-1c: config workflow.text_mode=false wins over CLAUDECODE', () => {
+  const restore = _clearClaudeEnv();
+  try {
+    process.env.CLAUDECODE = '1';
+    const sandbox = makeSandbox();
+    seedRoadmapYaml(sandbox, _baseRoadmap());
+    fs.writeFileSync(
+      path.join(sandbox, '.nubos-pilot', 'config.json'),
+      JSON.stringify({ workflow: { text_mode: false } }),
+    );
+    const cap = _captureStdout();
+    subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
+    const payload = JSON.parse(cap.get().trim());
+    assert.equal(payload.text_mode, false);
+    assert.equal(payload.text_mode_source, 'config');
+  } finally {
+    restore();
+  }
 });
 
 test('DP-2: run(["nonexistent"]) throws discuss-invalid-phase-arg', () => {
