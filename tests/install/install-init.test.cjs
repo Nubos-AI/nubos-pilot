@@ -59,6 +59,7 @@ test('install-p8-02: writes .opencode/nubos-pilot/ payload tree and merges manif
   await install.runInstall({
     cwd: root,
     mode: 'init',
+    flags: { agents: ['claude', 'opencode'] },
     askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'codex', source: 'test' }),
   });
   assert.ok(fs.existsSync(path.join(root, '.opencode', 'nubos-pilot', 'AGENTS.md')),
@@ -100,6 +101,7 @@ test('install-p8-03: writes opencode.json when absent (D-13)', async (t) => {
   await install.runInstall({
     cwd: root,
     mode: 'init',
+    flags: { agents: ['opencode'] },
     askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'codex', source: 'test' }),
   });
   const jsonPath = path.join(root, 'opencode.json');
@@ -180,6 +182,7 @@ test('install-p8-04: dry-run summary exposes wouldWriteGemini and wouldWriteOpen
     cwd: root,
     mode: 'init',
     dryRun: true,
+    flags: { agents: ['opencode'] },
     askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'codex', source: 'test' }),
   });
   assert.equal(typeof summary.wouldWriteGemini, 'boolean',
@@ -188,6 +191,70 @@ test('install-p8-04: dry-run summary exposes wouldWriteGemini and wouldWriteOpen
     'summary.wouldWriteOpencodeJson must be a boolean');
   assert.equal(summary.wouldWriteOpencodeJson, true,
     'Fresh sandbox has no opencode.json → wouldWriteOpencodeJson must be true');
+});
+
+test('install-p8-02: claude-only install does NOT create .opencode/ or opencode.json', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('p8-02-claude-only');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  writeClaudeMd(root);
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    flags: { agents: ['claude'] },
+    askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' }),
+  });
+  assert.ok(!fs.existsSync(path.join(root, '.opencode')),
+    'claude-only install must NOT create .opencode/ parent');
+  assert.ok(!fs.existsSync(path.join(root, 'opencode.json')),
+    'claude-only install must NOT create opencode.json');
+});
+
+test('install-assets: claude install copies workflows → .claude/commands/np/ and agents → .claude/agents/', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('assets-claude');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  writeClaudeMd(root);
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    flags: { agents: ['claude'] },
+    askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' }),
+  });
+  assert.ok(fs.existsSync(path.join(root, '.claude', 'commands', 'np', 'help.md')),
+    'workflow help.md must be installed at .claude/commands/np/help.md');
+  assert.ok(fs.existsSync(path.join(root, '.claude', 'commands', 'np', 'plan-phase.md')),
+    'workflow plan-phase.md must be installed at .claude/commands/np/plan-phase.md');
+  assert.ok(fs.existsSync(path.join(root, '.claude', 'agents', 'np-planner.md')),
+    'agent np-planner.md must be installed at .claude/agents/np-planner.md');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, '.claude', 'nubos-pilot', '.manifest.json'), 'utf-8'));
+  assert.ok(manifest.files['.claude/commands/np/help.md'],
+    'manifest must track .claude/commands/np/help.md');
+  assert.ok(manifest.files['.claude/agents/np-planner.md'],
+    'manifest must track .claude/agents/np-planner.md');
+});
+
+test('install-assets: uninstall removes installed commands, agents, and empty parent dirs', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('assets-uninstall');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+  writeClaudeMd(root);
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    flags: { agents: ['claude'] },
+    askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'claude', source: 'test' }),
+  });
+  assert.ok(fs.existsSync(path.join(root, '.claude', 'commands', 'np', 'help.md')));
+  await install.runUninstall({ cwd: root });
+  assert.ok(!fs.existsSync(path.join(root, '.claude', 'commands', 'np', 'help.md')),
+    'command file must be removed on uninstall');
+  assert.ok(!fs.existsSync(path.join(root, '.claude', 'agents', 'np-planner.md')),
+    'agent file must be removed on uninstall');
+  assert.ok(!fs.existsSync(path.join(root, '.claude', 'commands')),
+    'empty .claude/commands/ must be pruned');
+  assert.ok(!fs.existsSync(path.join(root, '.claude', 'agents')),
+    'empty .claude/agents/ must be pruned');
 });
 
 test('install-p8-04: dry-run preserves existing opencode.json reflected in summary', async (t) => {

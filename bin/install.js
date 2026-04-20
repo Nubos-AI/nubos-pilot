@@ -15,6 +15,7 @@ const codexTomlMod = require('../lib/install/codex-toml.cjs');
 const runtimeDetectMod = require('../lib/install/runtime-detect.cjs');
 const backupMod = require('../lib/install/backup.cjs');
 const registryMod = require('../lib/install/runtimes-registry.cjs');
+const runtimeAssetsMod = require('../lib/install/runtime-assets.cjs');
 
 const cyan = '\x1b[36m', green = '\x1b[32m', yellow = '\x1b[33m',
       red = '\x1b[31m', blue = '\x1b[38;5;33m',
@@ -53,6 +54,8 @@ const OPENCODE_SUBPATH = path.join('.opencode', 'nubos-pilot');
 const OPENCODE_MANIFEST_PREFIX = '.opencode/nubos-pilot/';
 const SOURCE_OPENCODE_DIR = path.join(__dirname, '..', 'templates', 'opencode', 'payload');
 const OPENCODE_JSON_TEMPLATE = path.join(__dirname, '..', 'templates', 'opencode', 'opencode.json');
+const SOURCE_WORKFLOWS_DIR = path.join(__dirname, '..', 'workflows');
+const SOURCE_AGENTS_DIR = path.join(__dirname, '..', 'agents');
 
 function _autoAskUser(spec) {
   return Promise.resolve({
@@ -146,6 +149,17 @@ function _readExistingScope(projectRoot) {
   try {
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
     return cfg && cfg.scope ? cfg.scope : null;
+  } catch { return null; }
+}
+
+function _readExistingRuntimes(projectRoot) {
+  const cfgPath = path.join(_stateDirFor(projectRoot), 'config.json');
+  if (!fs.existsSync(cfgPath)) return null;
+  try {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    if (Array.isArray(cfg.runtimes) && cfg.runtimes.length) return cfg.runtimes.slice();
+    if (cfg.runtime) return [cfg.runtime];
+    return null;
   } catch { return null; }
 }
 
@@ -344,13 +358,31 @@ async function _runInstallLocked(ctx) {
   try { pkgVersion = String(require('../package.json').version || '0.0.0'); } catch {}
   const newManifest = manifestMod.buildManifest(tmp, pkgVersion);
 
+  const selectedRuntimesEarly = (initConfig && initConfig.runtimes)
+    || (initConfig ? [initConfig.runtime] : null)
+    || _readExistingRuntimes(projectRoot)
+    || [];
+  const opencodeSelected = selectedRuntimesEarly.includes('opencode');
+
+  const assetPlans = runtimeAssetsMod.planRuntimeAssets({
+    selectedRuntimes: selectedRuntimesEarly,
+    scope: resolvedScope,
+    projectRoot,
+    workflowsDir: SOURCE_WORKFLOWS_DIR,
+    agentsDir: SOURCE_AGENTS_DIR,
+  });
+  const assetEntries = runtimeAssetsMod.manifestEntriesForPlans(assetPlans);
+  for (const k of Object.keys(assetEntries)) {
+    newManifest.files[k] = assetEntries[k];
+  }
+
   const opencodeTarget = _opencodePayloadDirFor(projectRoot, resolvedScope);
   const opencodeManifestPrefix = _opencodeManifestPrefix(resolvedScope);
   const opencodeTmp = path.join(stateDir, '.opencode.tmp');
   try { fs.rmSync(opencodeTmp, { recursive: true, force: true }); } catch {}
   try {
   let opencodeManifest = null;
-  if (fs.existsSync(SOURCE_OPENCODE_DIR)) {
+  if (opencodeSelected && fs.existsSync(SOURCE_OPENCODE_DIR)) {
     _copyTree(SOURCE_OPENCODE_DIR, opencodeTmp);
     opencodeManifest = manifestMod.buildManifest(opencodeTmp, pkgVersion);
     for (const rel of Object.keys(opencodeManifest.files)) {
@@ -388,7 +420,7 @@ async function _runInstallLocked(ctx) {
       wouldWrite: Object.keys(newManifest.files).length,
       wouldBackup: backupLog.length, wouldDelete: diff.stale.length,
       wouldWriteGemini: true,
-      wouldWriteOpencodeJson: !fs.existsSync(path.join(projectRoot, 'opencode.json')),
+      wouldWriteOpencodeJson: opencodeSelected && !fs.existsSync(path.join(projectRoot, 'opencode.json')),
       stale: diff.stale, changed: diff.changed, added: diff.added };
     process.stdout.write(JSON.stringify(summary, null, 2) + '\n');
     try { stagingMod.cleanStaleStaging(payloadBase); } catch {}
@@ -436,10 +468,30 @@ async function _runInstallLocked(ctx) {
         try { fs.unlinkSync(relFs); } catch {}
       }
     }
+  } else if (!opencodeSelected && fs.existsSync(opencodeTarget)) {
+    try { fs.rmSync(opencodeTarget, { recursive: true, force: true }); } catch {}
+    const opencodeParent = path.dirname(opencodeTarget);
+    try { fs.rmdirSync(opencodeParent); } catch {}
+    const projectOpencodeJson = path.join(projectRoot, 'opencode.json');
+    if (fs.existsSync(projectOpencodeJson) && fs.existsSync(OPENCODE_JSON_TEMPLATE)) {
+      try {
+        const template = fs.readFileSync(OPENCODE_JSON_TEMPLATE, 'utf-8');
+        const existing = fs.readFileSync(projectOpencodeJson, 'utf-8');
+        if (existing === template) fs.unlinkSync(projectOpencodeJson);
+      } catch {}
+    }
   }
 
   const selectedRuntimes = (initConfig && initConfig.runtimes) || (initConfig ? [initConfig.runtime] : []);
   _rewriteManagedMarkdown(projectRoot, selectedRuntimes);
+
+  if (assetPlans.length) {
+    runtimeAssetsMod.writeRuntimeAssets(assetPlans);
+  }
+  const assetStale = diff.stale.filter(runtimeAssetsMod.isAssetManifestKey);
+  if (assetStale.length) {
+    runtimeAssetsMod.removeStaleAssets(assetStale, resolvedScope, projectRoot);
+  }
 
   if (initConfig && initConfig.mcp && !dryRun) {
     try {
@@ -455,10 +507,12 @@ async function _runInstallLocked(ctx) {
     }
   }
 
-  const projectOpencodeJson = path.join(projectRoot, 'opencode.json');
-  if (!fs.existsSync(projectOpencodeJson) && fs.existsSync(OPENCODE_JSON_TEMPLATE)) {
-    const template = fs.readFileSync(OPENCODE_JSON_TEMPLATE, 'utf-8');
-    atomicWriteFileSync(projectOpencodeJson, template);
+  if (opencodeSelected) {
+    const projectOpencodeJson = path.join(projectRoot, 'opencode.json');
+    if (!fs.existsSync(projectOpencodeJson) && fs.existsSync(OPENCODE_JSON_TEMPLATE)) {
+      const template = fs.readFileSync(OPENCODE_JSON_TEMPLATE, 'utf-8');
+      atomicWriteFileSync(projectOpencodeJson, template);
+    }
   }
 
   try { _repairCodexConfig(); } catch (err) {
@@ -503,13 +557,32 @@ function _runUninstallLocked(projectRoot) {
     }
   }
 
+  const payloadBase = scope === 'global' ? os.homedir() : projectRoot;
   let removed = 0;
+  const assetDirs = new Set();
   for (const rel of Object.keys(manifest.files)) {
-    const abs = path.join(payloadDir, rel);
-    try { fs.unlinkSync(abs); removed++; } catch (err) {
+    const isAsset = runtimeAssetsMod.isAssetManifestKey(rel);
+    const abs = isAsset ? path.join(payloadBase, rel) : path.join(payloadDir, rel);
+    try {
+      fs.unlinkSync(abs);
+      removed++;
+      if (isAsset) assetDirs.add(path.dirname(abs));
+    } catch (err) {
       if (err && err.code !== 'ENOENT') {
         console.error(yellow + '  [uninstall] ' + rel + ' not removed: ' + err.message + reset);
       }
+    }
+  }
+  const sortedDirs = Array.from(assetDirs).sort((a, b) => b.length - a.length);
+  for (const dir of sortedDirs) {
+    let cur = dir;
+    while (cur && cur.startsWith(payloadBase) && cur !== payloadBase) {
+      try {
+        const entries = fs.readdirSync(cur);
+        if (entries.length > 0) break;
+        fs.rmdirSync(cur);
+      } catch { break; }
+      cur = path.dirname(cur);
     }
   }
 

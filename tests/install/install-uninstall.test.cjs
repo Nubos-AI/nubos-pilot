@@ -61,6 +61,7 @@ test('install-uninstall: OpenCode uninstall is surgical — removes .opencode/nu
   await install.runInstall({
     cwd: root,
     mode: 'init',
+    flags: { agents: ['claude', 'opencode'] },
     askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'codex', source: 'test' }),
   });
   assert.ok(fs.existsSync(path.join(root, '.opencode', 'nubos-pilot', 'AGENTS.md')),
@@ -87,6 +88,7 @@ test('install-uninstall: OpenCode parent .opencode/ is rmdir-ed when empty after
   await install.runInstall({
     cwd: root,
     mode: 'init',
+    flags: { agents: ['opencode'] },
     askUser: async (spec) => ({ value: spec && spec.default !== undefined ? spec.default : 'codex', source: 'test' }),
   });
   assert.ok(fs.existsSync(path.join(root, '.opencode', 'nubos-pilot')),
