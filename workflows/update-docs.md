@@ -1,6 +1,7 @@
 ---
 command: np:update-docs
 description: Incremental codebase-doc refresh — diffs current source against .hashes.json, refreshes only affected module docs, and updates the manifest.
+argument-hint: [--path <path>] [--batch-size <N>] [--max-files <N>] [--module <id>]
 ---
 
 # np:update-docs

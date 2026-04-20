@@ -1,17 +1,20 @@
+'use strict';
+
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
 
 const { NubosPilotError, projectStateDir } = require('../../lib/core.cjs');
+const layout = require('../../lib/layout.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 
-function _parsePhaseArg(raw) {
+function _parseMilestoneArg(raw) {
   if (raw == null || raw === '') {
     throw new NubosPilotError(
       'research-invalid-phase-arg',
-      'research-phase requires a phase number argument',
+      'research-phase requires a milestone number argument',
       { value: raw == null ? '' : String(raw) },
     );
   }
@@ -26,46 +29,16 @@ function _parsePhaseArg(raw) {
   return n;
 }
 
-function _paddedPhase(n) {
-  return String(n).padStart(2, '0');
-}
-
-function _findPhaseDir(cwd, padded) {
-
-  
-  let phasesRoot;
-  try {
-    phasesRoot = path.join(projectStateDir(cwd), 'phases');
-  } catch (err) {
-    if (!err || err.code !== 'not-in-project') throw err;
-    phasesRoot = path.join(path.resolve(cwd), '.planning', 'phases');
-  }
-  try {
-    const entries = fs.readdirSync(phasesRoot, { withFileTypes: true });
-    const hit = entries
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name)
-      .find((name) => name === padded || name.startsWith(padded + '-'));
-    if (hit) return path.join(phasesRoot, hit);
-  } catch (err) {
-    if (err && err.code !== 'ENOENT') throw err;
-  }
-
-  
-
-  return path.join(phasesRoot, padded);
-}
-
-function _readRoadmapPhase(cwd, phaseNumber) {
+function _readMilestoneDef(cwd, mNum) {
   const { getPhase } = require('../../lib/roadmap.cjs');
   try {
-    return getPhase(phaseNumber, cwd);
+    return getPhase(mNum, cwd);
   } catch (err) {
     if (err && err.name === 'NubosPilotError' && err.code === 'phase-not-found') {
       throw new NubosPilotError(
         'research-phase-not-found',
-        'Phase ' + phaseNumber + ' not found in roadmap',
-        { number: phaseNumber },
+        'Milestone ' + mNum + ' not found in roadmap',
+        { number: mNum },
       );
     }
     throw err;
@@ -85,7 +58,7 @@ function _agentSkills(cwd) {
     if (typeof agents.getAgentSkills === 'function') {
       return { researcher: agents.getAgentSkills('np-researcher', cwd) };
     }
-  } catch (_err) {  }
+  } catch (_err) { /* optional */ }
   return { researcher: null };
 }
 
@@ -113,27 +86,37 @@ function run(args, ctx) {
   const cwd = context.cwd || process.cwd();
   const stdout = context.stdout || process.stdout;
 
-  const phase = _parsePhaseArg((args || [])[0]);
-  const padded = _paddedPhase(phase);
-  const phaseInfo = _readRoadmapPhase(cwd, phase);
-  const phase_dir = _findPhaseDir(cwd, padded);
+  const mNum = _parseMilestoneArg((args || [])[0]);
+  const def = _readMilestoneDef(cwd, mNum);
+  const mIdStr = layout.mId(mNum);
+  const mDir = layout.milestoneDir(mNum, cwd);
+  const researchPath = path.join(mDir, mIdStr + '-RESEARCH.md');
 
-  const researchPath = path.join(phase_dir, padded + '-RESEARCH.md');
   let has_research = false;
-  try {
-    has_research = fs.statSync(researchPath).isFile();
-  } catch (_err) { has_research = false; }
+  try { has_research = fs.statSync(researchPath).isFile(); }
+  catch (_err) { has_research = false; }
+
+  const slices = layout.listSlices(mNum, cwd);
+  const sliceResearch = slices.map((s) => {
+    const p = layout.sliceResearchPath(mNum, s.number, cwd);
+    return {
+      id: s.id,
+      full_id: s.full_id,
+      path: p,
+      has_research: fs.existsSync(p),
+    };
+  });
 
   const payload = {
     _workflow: 'research-phase',
-    phase,
-    padded,
-    phase_dir,
-    goal: phaseInfo.goal || '',
-    requirements: Array.isArray(phaseInfo.requirements)
-      ? phaseInfo.requirements.slice()
-      : [],
+    milestone: mNum,
+    milestone_id: mIdStr,
+    milestone_dir: mDir,
+    milestone_research_path: researchPath,
+    goal: def.goal || '',
+    requirements: Array.isArray(def.requirements) ? def.requirements.slice() : [],
     has_research,
+    slice_research: sliceResearch,
     tools_available: _toolsAvailable(),
     agent_skills: _agentSkills(cwd),
   };
@@ -141,4 +124,4 @@ function run(args, ctx) {
   return payload;
 }
 
-module.exports = { run, INLINE_THRESHOLD_BYTES, _parsePhaseArg };
+module.exports = { run, INLINE_THRESHOLD_BYTES, _parseMilestoneArg };

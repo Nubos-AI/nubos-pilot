@@ -44,18 +44,19 @@ session:
 }
 
 function seedPlanAndTask(root, planId, taskId, filesModified) {
-  const phase = planId.slice(0, 2);
-  const phaseDir = path.join(root, '.nubos-pilot', 'phases', phase + '-demo');
-  const planDir = phaseDir;
-  const tasksDir = path.join(planDir, 'tasks');
-  fs.mkdirSync(tasksDir, { recursive: true });
+  // planId format: M006-S001 (ignored param compat); taskId: M006-S001-T0001
+  const m = taskId.match(/^(M\d{3,})-(S\d{3,})-(T\d{4,})$/);
+  if (!m) throw new Error('bad taskId: ' + taskId);
+  const [, mId, sId, tId] = m;
+  const taskDir = path.join(root, '.nubos-pilot', 'milestones', mId, 'slices', sId, 'tasks', tId);
+  fs.mkdirSync(taskDir, { recursive: true });
 
   const fm = [
     '---',
     `id: ${taskId}`,
-    `phase: ${Number(phase)}`,
-    `plan: "${planId}"`,
-    'type: auto',
+    `milestone: ${mId}`,
+    `slice: ${mId}-${sId}`,
+    'type: execute',
     'status: in-progress',
     'tier: sonnet',
     'owner: np-executor',
@@ -70,10 +71,9 @@ function seedPlanAndTask(root, planId, taskId, filesModified) {
     '',
     '# Task: demo',
   ].join('\n');
-  fs.writeFileSync(path.join(tasksDir, taskId + '.md'), fm, 'utf-8');
-
-  fs.writeFileSync(path.join(phaseDir, `${planId}-PLAN.md`), '---\nphase: '+Number(phase)+'\nplan: '+planId.slice(3)+'\n---\n', 'utf-8');
-  return { phaseDir, planDir, taskPath: path.join(tasksDir, taskId + '.md') };
+  const taskPath = path.join(taskDir, tId + '-PLAN.md');
+  fs.writeFileSync(taskPath, fm, 'utf-8');
+  return { taskDir, taskPath };
 }
 
 function _capture() {
@@ -109,7 +109,7 @@ test('CT-2: commit-task rejects invalid TASK_ID format (defense-in-depth)', () =
 
 test('CT-3: commit-task emits JSON with sha + files on success', () => {
   const root = makeRepo();
-  seedPlanAndTask(root, '06-01', '06-01-T01', ['src/a.ts']);
+  seedPlanAndTask(root, '06-01', 'M006-S001-T0001', ['src/a.ts']);
 
   fs.mkdirSync(path.join(root, 'src'), { recursive: true });
   fs.writeFileSync(path.join(root, 'src', 'a.ts'), 'export const a = 1;\n', 'utf-8');
@@ -117,23 +117,23 @@ test('CT-3: commit-task emits JSON with sha + files on success', () => {
   process.chdir(root);
   const cap = _capture();
   try {
-    subcmd.run(['06-01-T01'], { cwd: root, stdout: cap.stub });
+    subcmd.run(['M006-S001-T0001'], { cwd: root, stdout: cap.stub });
   } finally {
     process.chdir(prev);
   }
   const payload = JSON.parse(cap.get());
   assert.equal(payload.ok, true);
-  assert.equal(payload.task_id, '06-01-T01');
+  assert.equal(payload.task_id, 'M006-S001-T0001');
   assert.ok(/^[0-9a-f]{40}$/.test(payload.sha));
   assert.deepEqual(payload.files, ['src/a.ts']);
 
   const subject = execFileSync('git', ['-C', root, 'log', '-n', '1', '--format=%s'], { encoding: 'utf-8' }).trim();
-  assert.ok(subject.startsWith('task(06-01-T01):'), 'subject: ' + subject);
+  assert.ok(subject.startsWith('task(M006-S001-T0001):'), 'subject: ' + subject);
 });
 
 test('CT-4: commit-task LOUD-FAILS when every files_modified entry is gitignored (D-25)', () => {
   const root = makeRepo();
-  seedPlanAndTask(root, '06-01', '06-01-T02', ['build/out.js']);
+  seedPlanAndTask(root, '06-01', 'M006-S001-T0002', ['build/out.js']);
   fs.writeFileSync(path.join(root, '.gitignore'), 'build/\n', 'utf-8');
   fs.mkdirSync(path.join(root, 'build'), { recursive: true });
   fs.writeFileSync(path.join(root, 'build', 'out.js'), 'noise', 'utf-8');
@@ -142,7 +142,7 @@ test('CT-4: commit-task LOUD-FAILS when every files_modified entry is gitignored
   const cap = _capture();
   try {
     assert.throws(
-      () => subcmd.run(['06-01-T02'], { cwd: root, stdout: cap.stub }),
+      () => subcmd.run(['M006-S001-T0002'], { cwd: root, stdout: cap.stub }),
       (err) => err && err.code === 'commit-all-paths-gitignored',
     );
   } finally {
@@ -154,7 +154,7 @@ test('CT-5: commit-task unknown task id → task-not-found', () => {
   const root = makeRepo();
   const cap = _capture();
   assert.throws(
-    () => subcmd.run(['06-99-T99'], { cwd: root, stdout: cap.stub }),
+    () => subcmd.run(['M006-S099-T0099'], { cwd: root, stdout: cap.stub }),
     (err) => err && err.code === 'commit-task-not-found',
   );
 });

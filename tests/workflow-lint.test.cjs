@@ -9,27 +9,24 @@ const WORKFLOWS_DIR = path.join(REPO_ROOT, 'workflows');
 const { initWorkflows, topLevelCommands } = require(path.join(REPO_ROOT, 'np-tools.cjs'));
 
 const BUILTIN_TOPLEVEL = new Set([
-  'init', 'next', 'progress', 'state', 'help', 'askuser',
+  'init', 'state', 'help', 'askuser',
 ]);
 
 const KNOWN_COMMANDS = new Set([
   ...Object.keys(initWorkflows),
   ...Object.keys(topLevelCommands),
   ...BUILTIN_TOPLEVEL,
+  // User-facing workflow aliases that map to milestone-scoped init commands
+  'plan-phase', 'execute-phase', 'validate-phase',
 ]);
 
 const LEGACY_MISSING_FRONTMATTER = new Set([
-  'discuss-phase-power.md', 'dispatch.md', 'doctor.md', 'help.md',
-  'next.md', 'progress.md', 'queue.md', 'state.md', 'triage.md',
+  'doctor.md', 'help.md', 'state.md',
 ]);
 
-const LEGACY_COMMAND_FILENAME_OVERRIDES = new Set([
-  'discuss-phase-assumptions.md',
-]);
+const LEGACY_COMMAND_FILENAME_OVERRIDES = new Set();
 
-const LEGACY_UNKNOWN_COMMAND_REFERENCES = new Set([
-  'review', 'secure-phase', 'frontmatter-set', 'validate-phase',
-]);
+const LEGACY_UNKNOWN_COMMAND_REFERENCES = new Set();
 
 const NEW_WORKFLOWS = [
   'scan-codebase.md', 'update-docs.md', 'discuss-project.md', 'new-project.md',

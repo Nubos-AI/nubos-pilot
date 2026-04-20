@@ -42,12 +42,13 @@ session:
 }
 
 function seedTask(root, taskId, files) {
-  const phaseDir = path.join(root, '.nubos-pilot', 'phases', '06-demo');
-  const tasksDir = path.join(phaseDir, 'tasks');
-  fs.mkdirSync(tasksDir, { recursive: true });
-  fs.writeFileSync(path.join(tasksDir, taskId + '.md'), [
+  const m = taskId.match(/^(M\d{3,})-(S\d{3,})-(T\d{4,})$/);
+  const [, mId, sId, tId] = m;
+  const taskDir = path.join(root, '.nubos-pilot', 'milestones', mId, 'slices', sId, 'tasks', tId);
+  fs.mkdirSync(taskDir, { recursive: true });
+  fs.writeFileSync(path.join(taskDir, tId + '-PLAN.md'), [
     '---',
-    `id: ${taskId}`, 'phase: 6', 'plan: "06-01"', 'type: auto',
+    `id: ${taskId}`, `milestone: ${mId}`, `slice: ${mId}-${sId}`, 'type: execute',
     'status: in-progress', 'tier: sonnet', 'owner: np-executor', 'wave: 1',
     'depends_on: []', 'files_modified:',
     ...files.map((f) => `  - ${f}`),
@@ -68,12 +69,12 @@ test('SMOKE-CT-1: commit-task LOUD-FAILS when all files_modified are gitignored 
   fs.writeFileSync(path.join(root, '.gitignore'), 'build/\n', 'utf-8');
   fs.mkdirSync(path.join(root, 'build'), { recursive: true });
   fs.writeFileSync(path.join(root, 'build', 'out.js'), 'noise', 'utf-8');
-  seedTask(root, '06-01-T01', ['build/out.js']);
+  seedTask(root, 'M006-S001-T0001', ['build/out.js']);
 
   const commitsBefore = execFileSync('git', ['-C', root, 'log', '--format=%H'], { encoding: 'utf-8' })
     .trim().split('\n').filter(Boolean).length;
 
-  const res = spawnSync(process.execPath, [path.join(REPO_ROOT, 'np-tools.cjs'), 'commit-task', '06-01-T01'], {
+  const res = spawnSync(process.execPath, [path.join(REPO_ROOT, 'np-tools.cjs'), 'commit-task', 'M006-S001-T0001'], {
     cwd: root,
     encoding: 'utf-8',
   });

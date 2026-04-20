@@ -22,18 +22,31 @@ function seedRoadmapYaml(root, data) {
   fs.writeFileSync(target, YAML.stringify(data, { indent: 2 }), 'utf-8');
 }
 
-function seedPhaseDir(root, n, slug, files) {
-  const padded = String(n).padStart(2, '0');
-  const dirName = slug ? padded + '-' + slug : padded;
-  const phaseDir = path.join(root, '.nubos-pilot', 'phases', dirName);
-  fs.mkdirSync(phaseDir, { recursive: true });
-  const payload = files || {};
-  for (const [name, content] of Object.entries(payload)) {
-    const target = path.join(phaseDir, name);
+function seedMilestoneDir(root, mNum, files) {
+  const id = 'M' + String(mNum).padStart(3, '0');
+  const mDir = path.join(root, '.nubos-pilot', 'milestones', id);
+  fs.mkdirSync(mDir, { recursive: true });
+  fs.mkdirSync(path.join(mDir, 'slices'), { recursive: true });
+  for (const [name, content] of Object.entries(files || {})) {
+    const target = path.join(mDir, name);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, content, 'utf-8');
   }
-  return phaseDir;
+  return mDir;
+}
+
+function seedSliceDir(root, mNum, sNum, files) {
+  const mId = 'M' + String(mNum).padStart(3, '0');
+  const sId = 'S' + String(sNum).padStart(3, '0');
+  const sDir = path.join(root, '.nubos-pilot', 'milestones', mId, 'slices', sId);
+  fs.mkdirSync(sDir, { recursive: true });
+  fs.mkdirSync(path.join(sDir, 'tasks'), { recursive: true });
+  for (const [name, content] of Object.entries(files || {})) {
+    const target = path.join(sDir, name);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content, 'utf-8');
+  }
+  return sDir;
 }
 
 function cleanupAll() {
@@ -47,4 +60,4 @@ function cleanupAll() {
   }
 }
 
-module.exports = { makeSandbox, seedRoadmapYaml, seedPhaseDir, cleanupAll };
+module.exports = { makeSandbox, seedRoadmapYaml, seedMilestoneDir, seedSliceDir, cleanupAll };

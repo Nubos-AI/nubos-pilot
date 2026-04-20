@@ -53,29 +53,29 @@ after(() => {
 test('CPT-1: checkpoint start writes file and updates STATE.current_task', () => {
   const root = makeRoot();
   const cap = _capture();
-  subcmd.run(['start', '06-01-T01', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
-  const cp = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'checkpoints', '06-01-T01.json'), 'utf-8'));
-  assert.equal(cp.task_id, '06-01-T01');
+  subcmd.run(['start', 'M006-S001-T0001', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
+  const cp = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'checkpoints', 'M006-S001-T0001.json'), 'utf-8'));
+  assert.equal(cp.task_id, 'M006-S001-T0001');
   assert.equal(cp.status, 'in-progress');
   const state = fs.readFileSync(path.join(root, '.nubos-pilot', 'STATE.md'), 'utf-8');
-  assert.ok(state.includes('current_task: 06-01-T01'), state);
+  assert.ok(state.includes('current_task: M006-S001-T0001'), state);
 });
 
 test('CPT-2: checkpoint transition updates status', () => {
   const root = makeRoot();
   const cap = _capture();
-  subcmd.run(['start', '06-01-T02', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
-  subcmd.run(['transition', '06-01-T02', 'verifying'], { cwd: root, stdout: cap.stub });
-  const cp = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'checkpoints', '06-01-T02.json'), 'utf-8'));
+  subcmd.run(['start', 'M006-S001-T0002', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
+  subcmd.run(['transition', 'M006-S001-T0002', 'verifying'], { cwd: root, stdout: cap.stub });
+  const cp = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'checkpoints', 'M006-S001-T0002.json'), 'utf-8'));
   assert.equal(cp.status, 'verifying');
 });
 
 test('CPT-3: checkpoint transition rejects unknown status', () => {
   const root = makeRoot();
   const cap = _capture();
-  subcmd.run(['start', '06-01-T03', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
+  subcmd.run(['start', 'M006-S001-T0003', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
   assert.throws(
-    () => subcmd.run(['transition', '06-01-T03', 'weird'], { cwd: root, stdout: cap.stub }),
+    () => subcmd.run(['transition', 'M006-S001-T0003', 'weird'], { cwd: root, stdout: cap.stub }),
     (err) => err && err.code === 'checkpoint-invalid-status',
   );
 });
@@ -83,28 +83,28 @@ test('CPT-3: checkpoint transition rejects unknown status', () => {
 test('CPT-4: checkpoint touch appends to files_touched', () => {
   const root = makeRoot();
   const cap = _capture();
-  subcmd.run(['start', '06-01-T04', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
-  subcmd.run(['touch', '06-01-T04', 'src/a.ts'], { cwd: root, stdout: cap.stub });
-  subcmd.run(['touch', '06-01-T04', 'src/b.ts'], { cwd: root, stdout: cap.stub });
-  const cp = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'checkpoints', '06-01-T04.json'), 'utf-8'));
+  subcmd.run(['start', 'M006-S001-T0004', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap.stub });
+  subcmd.run(['touch', 'M006-S001-T0004', 'src/a.ts'], { cwd: root, stdout: cap.stub });
+  subcmd.run(['touch', 'M006-S001-T0004', 'src/b.ts'], { cwd: root, stdout: cap.stub });
+  const cp = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'checkpoints', 'M006-S001-T0004.json'), 'utf-8'));
   assert.deepEqual(cp.files_touched, ['src/a.ts', 'src/b.ts']);
 });
 
 test('CPT-5: checkpoint show emits JSON', () => {
   const root = makeRoot();
   const cap1 = _capture();
-  subcmd.run(['start', '06-01-T05', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap1.stub });
+  subcmd.run(['start', 'M006-S001-T0005', '--phase', '6', '--plan', '06-01', '--wave', '1'], { cwd: root, stdout: cap1.stub });
   const cap2 = _capture();
-  subcmd.run(['show', '06-01-T05'], { cwd: root, stdout: cap2.stub });
+  subcmd.run(['show', 'M006-S001-T0005'], { cwd: root, stdout: cap2.stub });
   const json = JSON.parse(cap2.get());
-  assert.equal(json.task_id, '06-01-T05');
+  assert.equal(json.task_id, 'M006-S001-T0005');
 });
 
 test('CPT-6: unknown verb throws', () => {
   const root = makeRoot();
   const cap = _capture();
   assert.throws(
-    () => subcmd.run(['bogus', '06-01-T01'], { cwd: root, stdout: cap.stub }),
+    () => subcmd.run(['bogus', 'M006-S001-T0001'], { cwd: root, stdout: cap.stub }),
     (err) => err && err.code === 'checkpoint-unknown-verb',
   );
 });

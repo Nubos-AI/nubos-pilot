@@ -37,9 +37,6 @@ test('install-init: full init flow writes .nubos-pilot/config.json with all cano
     'runtime',
     'model_profile',
     'commit_docs',
-    'branching_strategy',
-    'phase_branch_template',
-    'milestone_branch_template',
     'parallelization',
     'research',
     'plan_checker',
@@ -48,6 +45,9 @@ test('install-init: full init flow writes .nubos-pilot/config.json with all cano
   ];
   for (const key of expected) {
     assert.ok(key in config, 'config.json must contain key: ' + key);
+  }
+  for (const removed of ['branching_strategy', 'phase_branch_template', 'milestone_branch_template']) {
+    assert.ok(!(removed in config), 'config.json must NOT contain dead key: ' + removed);
   }
 });
 

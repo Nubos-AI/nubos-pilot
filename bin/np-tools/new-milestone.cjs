@@ -1,16 +1,20 @@
+'use strict';
+
 const fs = require('node:fs');
 const path = require('node:path');
+const YAML = require('yaml');
 
 const {
   NubosPilotError,
   atomicWriteFileSync,
+  withFileLock,
   projectStateDir,
 } = require('../../lib/core.cjs');
-const { addMilestone, addPhase, parseRoadmap } = require('../../lib/roadmap.cjs');
-const { createPhaseDir, phaseSlug } = require('../../lib/phase.cjs');
+const { parseRoadmap } = require('../../lib/roadmap.cjs');
 const { mutateState } = require('../../lib/state.cjs');
+const layout = require('../../lib/layout.cjs');
 
-const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates');
+const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates', 'milestone');
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
 
 function _render(raw, vars, templateName) {
@@ -27,20 +31,10 @@ function _render(raw, vars, templateName) {
 }
 
 function _loadTemplate(name) {
-  return fs.readFileSync(path.join(TEMPLATES_DIR, name + '.md'), 'utf-8');
-}
-
-function _slugify(raw) {
-  return String(raw || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+  return fs.readFileSync(path.join(TEMPLATES_DIR, name), 'utf-8');
 }
 
 function _writeFile(target, content) {
-
-  
-
   if (path.basename(target) === 'PROJECT.md') {
     throw new NubosPilotError(
       'new-milestone-forbidden-write',
@@ -60,11 +54,9 @@ function _interviewPayload() {
     mode: 'interview',
     questions: [
       { key: 'milestone_name', type: 'input',
-        question: 'Milestone name (e.g. "v2.0")?' },
+        question: 'Milestone name (e.g. "Auth & Basic UI")?' },
       { key: 'milestone_goal', type: 'input',
         question: 'Milestone goal — one sentence describing what ships in this milestone?' },
-      { key: 'first_phase_name', type: 'input',
-        question: 'First phase name for this milestone?' },
       { key: 'create_req_prefix', type: 'confirm',
         question: 'Create a new "## <milestone> Requirements" section in REQUIREMENTS.md?' },
     ],
@@ -72,7 +64,7 @@ function _interviewPayload() {
 }
 
 function _validateAnswers(a) {
-  for (const key of ['milestone_name', 'milestone_goal', 'first_phase_name']) {
+  for (const key of ['milestone_name', 'milestone_goal']) {
     if (typeof a[key] !== 'string' || a[key].trim() === '') {
       throw new NubosPilotError(
         'answers-missing-field',
@@ -104,17 +96,110 @@ function _guardInitialized(root) {
 function _appendReqPrefix(root, milestoneName) {
   const reqPath = path.join(root, '.nubos-pilot', 'REQUIREMENTS.md');
   const current = fs.readFileSync(reqPath, 'utf-8');
-
   const header = `\n## ${milestoneName} Requirements\n\n<!-- TBD: first requirement -->\n- [ ] **REQ-TBD**: TBD\n`;
-  let next;
   const marker = '\n## Out of Scope';
   const idx = current.indexOf(marker);
-  if (idx >= 0) {
-    next = current.slice(0, idx) + header + current.slice(idx);
-  } else {
-    next = current.endsWith('\n') ? current + header : current + '\n' + header;
-  }
+  const next = idx >= 0
+    ? current.slice(0, idx) + header + current.slice(idx)
+    : (current.endsWith('\n') ? current : current + '\n') + header;
   _writeFile(reqPath, next);
+}
+
+function _nextMilestoneNumber(root) {
+  let maxNum = 0;
+  try {
+    const { doc } = parseRoadmap(root);
+    if (doc && Array.isArray(doc.milestones)) {
+      for (const m of doc.milestones) {
+        if (!m) continue;
+        if (m.id === 'backlog') continue;
+        if (typeof m.number === 'number' && Number.isInteger(m.number) && m.number > maxNum) {
+          maxNum = m.number;
+        }
+        if (typeof m.id === 'string') {
+          const mm = m.id.match(/^M(\d+)$/);
+          if (mm) {
+            const n = Number(mm[1]);
+            if (Number.isInteger(n) && n > maxNum) maxNum = n;
+          }
+        }
+      }
+    }
+  } catch {
+    maxNum = 0;
+  }
+  return maxNum + 1;
+}
+
+function _addMilestoneToRoadmap(root, mNum, answers) {
+  const roadmapPath = path.join(root, '.nubos-pilot', 'roadmap.yaml');
+  return withFileLock(roadmapPath, () => {
+    let doc;
+    if (fs.existsSync(roadmapPath)) {
+      const raw = fs.readFileSync(roadmapPath, 'utf-8');
+      try { doc = YAML.parse(raw); } catch {
+        throw new NubosPilotError('roadmap-parse-error', 'roadmap.yaml invalid YAML', { path: roadmapPath });
+      }
+    }
+    if (!doc || typeof doc !== 'object') doc = { schema_version: 1, milestones: [] };
+    if (!Array.isArray(doc.milestones)) doc.milestones = [];
+    const id = layout.mId(mNum);
+    if (doc.milestones.some((m) => m && m.id === id)) {
+      throw new NubosPilotError(
+        'roadmap-duplicate-milestone',
+        'Milestone with id ' + id + ' already exists',
+        { id },
+      );
+    }
+    doc.milestones.push({
+      id,
+      number: mNum,
+      name: answers.milestone_name,
+      goal: answers.milestone_goal,
+      status: 'pending',
+      requirements: [],
+      success_criteria: [],
+      slices: [],
+    });
+    atomicWriteFileSync(roadmapPath, YAML.stringify(doc, { indent: 2 }));
+    return { id, number: mNum };
+  });
+}
+
+function _writeMilestoneArtefacts(root, mNum, answers) {
+  layout.createMilestoneDir(mNum, root);
+  const mIdStr = layout.mId(mNum);
+  const createdDate = new Date().toISOString().slice(0, 10);
+  const ctxVars = {
+    milestone_id: mIdStr,
+    milestone_name: answers.milestone_name,
+    created_date: createdDate,
+    goal_text: answers.milestone_goal,
+    decisions_text: '<!-- TBD: locked decisions from /np:discuss-phase -->',
+    deferred_text: '<!-- TBD: deferred ideas -->',
+    domain_text: '<!-- TBD: domain boundary -->',
+    canonical_refs_text: '<!-- TBD: canonical references -->',
+  };
+  const roadmapVars = {
+    milestone_id: mIdStr,
+    milestone_name: answers.milestone_name,
+    created_date: createdDate,
+    slices_text: '<!-- TBD: slices will be appended by /np:plan-phase ' + mNum + ' -->',
+  };
+  const metaVars = {
+    milestone_id: mIdStr,
+    milestone_name: JSON.stringify(answers.milestone_name).slice(1, -1),
+    status: 'pending',
+    created_date: createdDate,
+    goal_text_escaped: JSON.stringify(answers.milestone_goal).slice(1, -1),
+    requirements_json: '[]',
+    success_criteria_json: '[]',
+    slice_count: 0,
+    task_count: 0,
+  };
+  _writeFile(layout.milestoneContextPath(mNum, root), _render(_loadTemplate('CONTEXT.md'), ctxVars, 'milestone/CONTEXT.md'));
+  _writeFile(layout.milestoneRoadmapPath(mNum, root), _render(_loadTemplate('ROADMAP.md'), roadmapVars, 'milestone/ROADMAP.md'));
+  _writeFile(layout.milestoneMetaPath(mNum, root), _render(_loadTemplate('META.json'), metaVars, 'milestone/META.json'));
 }
 
 function _apply(answersPath, cwd, stdout) {
@@ -143,121 +228,36 @@ function _apply(answersPath, cwd, stdout) {
   const root = path.resolve(cwd);
   _guardInitialized(root);
 
-  const milestoneId = _slugify(answers.milestone_name);
-  if (milestoneId === '') {
-    throw new NubosPilotError(
-      'invalid-slug',
-      'milestone_name slugifies to empty string',
-      { value: answers.milestone_name, field: 'milestone_name' },
-    );
-  }
-  const firstPhaseSlug = phaseSlug(answers.first_phase_name);
-  if (firstPhaseSlug === '') {
-    throw new NubosPilotError(
-      'invalid-slug',
-      'first_phase_name slugifies to empty string',
-      { value: answers.first_phase_name, field: 'first_phase_name' },
-    );
-  }
+  const mNum = _nextMilestoneNumber(root);
+  const mIdStr = layout.mId(mNum);
 
-  
-
-  
-
-  
-
-  const { phases: existingPhases } = parseRoadmap(root);
-  let globalMax = 0;
-  for (const p of existingPhases) {
-    const n = Number(p.number);
-    if (Number.isInteger(n) && n > globalMax) globalMax = n;
-  }
-  const nextPhaseNumber = globalMax + 1;
-
-  
-
-  
-
-  
-
-  addMilestone(
-    {
-      id: milestoneId,
-      name: answers.milestone_name,
-      phases: [
-        {
-          number: nextPhaseNumber,
-          slug: firstPhaseSlug,
-          name: answers.first_phase_name,
-          goal: answers.milestone_goal,
-          depends_on: [],
-          requirements: [],
-          success_criteria: [],
-          status: 'pending',
-          plans: [],
-        },
-      ],
-    },
-    root,
-  );
-  const phaseResult = {
-    milestoneId,
-    number: nextPhaseNumber,
-    slug: firstPhaseSlug,
-  };
-
-  
-
-  void addPhase;
-
-  
-
-  const phaseDir = createPhaseDir(phaseResult.number, firstPhaseSlug, root);
-  const padded = String(phaseResult.number).padStart(2, '0');
-  const ctxVars = {
-    phase_number: String(phaseResult.number),
-    phase_name: answers.first_phase_name,
-    phase_padded: padded,
-    phase_slug: firstPhaseSlug,
-    created_date: new Date().toISOString().slice(0, 10),
-    domain_text: '<!-- TBD: phase boundary -->',
-    decisions_text: '<!-- TBD: decisions -->',
-    canonical_refs_text: '<!-- TBD: canonical references -->',
-    code_context_text: '<!-- TBD: existing code insights -->',
-    specifics_text: '<!-- TBD: specific ideas / references -->',
-    deferred_text: '<!-- TBD: deferred ideas -->',
-  };
-  const contextMdPath = path.join(phaseDir, padded + '-CONTEXT.md');
-  _writeFile(contextMdPath, _render(_loadTemplate('CONTEXT'), ctxVars, 'CONTEXT'));
-
-  
+  _addMilestoneToRoadmap(root, mNum, answers);
+  _writeMilestoneArtefacts(root, mNum, answers);
 
   if (answers.create_req_prefix === true) {
     _appendReqPrefix(root, answers.milestone_name);
   }
 
-  
-
   mutateState((state) => {
     const fm = Object.assign({}, state.frontmatter, {
-      milestone: milestoneId,
+      milestone: mIdStr,
+      milestone_number: mNum,
       milestone_name: answers.milestone_name,
-      current_phase: Number(phaseResult.number),
-      current_plan: null,
+      current_slice: null,
       current_task: null,
       last_updated: new Date().toISOString(),
     });
     return { frontmatter: fm, body: state.body };
   }, root);
 
-  
   projectStateDir(root);
 
   _emit(stdout, {
     mode: 'apply',
-    milestoneId,
-    phaseNumber: phaseResult.number,
-    phaseSlug: firstPhaseSlug,
+    milestone_id: mIdStr,
+    milestone_number: mNum,
+    milestone_name: answers.milestone_name,
+    milestone_dir: layout.milestoneDir(mNum, root),
     created_req_prefix: answers.create_req_prefix === true,
   });
 }

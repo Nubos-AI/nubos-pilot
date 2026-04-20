@@ -1,3 +1,5 @@
+'use strict';
+
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -5,7 +7,7 @@ const crypto = require('node:crypto');
 
 const { NubosPilotError, projectStateDir } = require('../../lib/core.cjs');
 const { getPhase } = require('../../lib/roadmap.cjs');
-const { paddedPhase, phaseSlug, findPhaseDir } = require('../../lib/phase.cjs');
+const layout = require('../../lib/layout.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 
@@ -19,25 +21,23 @@ function _parseArgs(args) {
   return { positional: rest, flags };
 }
 
-function _validatePhaseArg(raw) {
+function _validateMilestoneArg(raw) {
   if (raw == null || raw === '') {
     throw new NubosPilotError(
       'discuss-invalid-phase-arg',
-      'discuss-phase requires a phase number (integer or decimal like 7.1)',
+      'discuss-phase requires a milestone number (integer)',
       { value: raw == null ? '' : String(raw) },
     );
   }
   const s = String(raw);
-  const integerOk = /^\d+$/.test(s);
-  const decimalOk = /^\d+\.\d+$/.test(s);
-  if (!integerOk && !decimalOk) {
+  if (!/^\d+$/.test(s)) {
     throw new NubosPilotError(
       'discuss-invalid-phase-arg',
-      'Invalid phase number: ' + s,
+      'Invalid milestone number (must be positive integer): ' + s,
       { value: s },
     );
   }
-  return s;
+  return Number(s);
 }
 
 function _agentSkills() {
@@ -46,22 +46,8 @@ function _agentSkills() {
     if (typeof agents.getAgentSkills === 'function') {
       return { planner: agents.getAgentSkills('np-planner') };
     }
-  } catch (_err) {  }
+  } catch (_err) { /* skills optional */ }
   return { planner: null };
-}
-
-function _resolvePhaseDir(n, cwd, slug) {
-  const hit = findPhaseDir(n, cwd);
-  if (hit) return hit;
-
-  
-
-  const padded = paddedPhase(n);
-  let stateDir;
-  try { stateDir = projectStateDir(cwd); } catch (_err) {
-    stateDir = path.join(path.resolve(cwd), '.nubos-pilot');
-  }
-  return path.join(stateDir, 'phases', padded + '-' + slug);
 }
 
 function _emit(payload, stdout, cwd) {
@@ -88,39 +74,40 @@ function run(args, ctx) {
   const cwd = context.cwd || process.cwd();
   const stdout = context.stdout || process.stdout;
   const { positional, flags } = _parseArgs(args);
-  const phaseArg = _validatePhaseArg(positional[0]);
+  const mNum = _validateMilestoneArg(positional[0]);
 
-  let phase;
+  let def;
   try {
-    phase = getPhase(phaseArg, cwd);
+    def = getPhase(mNum, cwd);
   } catch (err) {
     if (err && err.code === 'phase-not-found') {
       throw new NubosPilotError(
         'discuss-phase-not-found',
-        'Phase ' + phaseArg + ' not found in roadmap.yaml',
-        { number: phaseArg },
+        'Milestone ' + mNum + ' not found in roadmap.yaml',
+        { number: mNum },
       );
     }
     throw err;
   }
 
-  const padded = paddedPhase(phaseArg);
-  const slug = phase.slug || phaseSlug(phase.name);
-  const phase_dir = _resolvePhaseDir(phaseArg, cwd, slug);
-  const contextPath = path.join(phase_dir, padded + '-CONTEXT.md');
+  const mIdStr = layout.mId(mNum);
+  const milestoneDir = layout.milestoneDir(mNum, cwd);
+  const contextPath = layout.milestoneContextPath(mNum, cwd);
   const has_context = fs.existsSync(contextPath);
+  const has_milestone_dir = fs.existsSync(milestoneDir);
 
   const payload = {
     _workflow: 'discuss-phase',
-    phase_number: phaseArg,
-    padded,
-    phase_dir,
-    phase_name: phase.name,
-    phase_slug: slug,
+    milestone: mNum,
+    milestone_id: mIdStr,
+    milestone_dir: milestoneDir,
+    milestone_name: def.name,
+    milestone_context_path: contextPath,
     has_context,
-    goal: phase.goal || '',
-    requirements: Array.isArray(phase.requirements) ? phase.requirements : [],
-    success_criteria: Array.isArray(phase.success_criteria) ? phase.success_criteria : [],
+    has_milestone_dir,
+    goal: def.goal || '',
+    requirements: Array.isArray(def.requirements) ? def.requirements : [],
+    success_criteria: Array.isArray(def.success_criteria) ? def.success_criteria : [],
     mode: flags.assumptions ? 'assumptions' : 'adaptive',
     agent_skills: _agentSkills(),
   };
@@ -129,4 +116,4 @@ function run(args, ctx) {
   return payload;
 }
 
-module.exports = { run, _parseArgs, _validatePhaseArg, INLINE_THRESHOLD_BYTES };
+module.exports = { run, _parseArgs, _validateMilestoneArg, INLINE_THRESHOLD_BYTES };

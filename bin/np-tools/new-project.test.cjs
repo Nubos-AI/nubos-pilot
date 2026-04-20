@@ -17,7 +17,7 @@ function makeEmptySandbox() {
 afterEach(() => {
   while (_sandboxes.length) {
     const p = _sandboxes.pop();
-    try { fs.rmSync(p, { recursive: true, force: true }); } catch {  }
+    try { fs.rmSync(p, { recursive: true, force: true }); } catch {}
   }
 });
 
@@ -32,8 +32,8 @@ function _baseAnswers() {
     project_name: 'Demo Project',
     core_value: 'Ship demos fast.',
     primary_constraints: 'Node 22; markdown-first',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'Foundation Phase',
+    first_milestone_name: 'Auth & Basic UI',
+    first_milestone_goal: 'Ship login and basic profile page',
   };
 }
 
@@ -43,7 +43,7 @@ function _writeAnswers(root, answers) {
   return p;
 }
 
-test('NP-1: run([]) emits interview JSON with all 5 questions', () => {
+test('NP-1: run([]) emits interview JSON with project + milestone questions', () => {
   const sandbox = makeEmptySandbox();
   const cap = _captureStdout();
   subcmd.run([], { cwd: sandbox, stdout: cap.stub });
@@ -56,7 +56,7 @@ test('NP-1: run([]) emits interview JSON with all 5 questions', () => {
     'core_value',
     'primary_constraints',
     'first_milestone_name',
-    'first_phase_name',
+    'first_milestone_goal',
   ]) {
     assert.ok(keys.includes(expected), 'interview missing ' + expected);
   }
@@ -66,26 +66,23 @@ test('NP-1: run([]) emits interview JSON with all 5 questions', () => {
   }
 });
 
-test('NP-2: --apply creates all 5 files + scaffolds first phase dir', () => {
+test('NP-2: --apply creates nubos-pilot milestone directory with CONTEXT/ROADMAP/META', () => {
   const sandbox = makeEmptySandbox();
   const answersPath = _writeAnswers(sandbox, _baseAnswers());
   const cap = _captureStdout();
   subcmd.run(['--apply', answersPath], { cwd: sandbox, stdout: cap.stub });
 
-  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'PROJECT.md')), 'PROJECT.md missing');
-  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'REQUIREMENTS.md')), 'REQUIREMENTS.md missing');
-  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'roadmap.yaml')), 'roadmap.yaml missing');
-  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'ROADMAP.md')), 'ROADMAP.md missing');
-  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'STATE.md')), 'STATE.md missing');
+  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'PROJECT.md')));
+  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'REQUIREMENTS.md')));
+  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'roadmap.yaml')));
+  assert.ok(fs.existsSync(path.join(sandbox, '.nubos-pilot', 'STATE.md')));
 
-  const phasesRoot = path.join(sandbox, '.nubos-pilot', 'phases');
-  const entries = fs.readdirSync(phasesRoot);
-  const phaseDir = entries.find((e) => e.startsWith('01-'));
-  assert.ok(phaseDir, 'phases/01-<slug>/ not scaffolded');
-  assert.ok(
-    fs.existsSync(path.join(phasesRoot, phaseDir, '01-CONTEXT.md')),
-    '01-CONTEXT.md placeholder missing',
-  );
+  const mDir = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001');
+  assert.ok(fs.existsSync(mDir), 'milestones/M001 missing');
+  assert.ok(fs.existsSync(path.join(mDir, 'M001-CONTEXT.md')));
+  assert.ok(fs.existsSync(path.join(mDir, 'M001-ROADMAP.md')));
+  assert.ok(fs.existsSync(path.join(mDir, 'M001-META.json')));
+  assert.ok(fs.existsSync(path.join(mDir, 'slices')));
 });
 
 test('NP-3: PROJECT.md is rendered with user-supplied values', () => {
@@ -97,7 +94,6 @@ test('NP-3: PROJECT.md is rendered with user-supplied values', () => {
   assert.match(raw, /Demo Project/);
   assert.match(raw, /Ship demos fast\./);
   assert.match(raw, /Node 22/);
-
   assert.doesNotMatch(raw, /\{\{[a-z_]+\}\}/);
 });
 
@@ -105,7 +101,6 @@ test('NP-4: second invocation throws project-already-initialized', () => {
   const sandbox = makeEmptySandbox();
   const answersPath = _writeAnswers(sandbox, _baseAnswers());
   subcmd.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
-
   const diffAnswers = Object.assign({}, _baseAnswers(), { project_name: 'Other' });
   const diffPath = _writeAnswers(sandbox, diffAnswers);
   assert.throws(
@@ -123,43 +118,56 @@ test('NP-5: shell-metachar project_name is stored literally, no files outside .n
   subcmd.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
   const raw = fs.readFileSync(path.join(sandbox, '.nubos-pilot', 'PROJECT.md'), 'utf-8');
   assert.match(raw, /rm -rf/);
-
   const entries = fs.readdirSync(sandbox).sort();
   assert.deepEqual(entries, ['.nubos-pilot', 'answers.json']);
 });
 
-test('NP-6: slugifies first_phase_name; strips non [a-z0-9-]', () => {
+test('NP-6: roadmap.yaml contains milestone M001 with slices array', () => {
   const sandbox = makeEmptySandbox();
-  const answers = Object.assign({}, _baseAnswers(), {
-    first_phase_name: 'Foo Bar! 2',
-  });
-  const answersPath = _writeAnswers(sandbox, answers);
+  const answersPath = _writeAnswers(sandbox, _baseAnswers());
   subcmd.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
-  const phasesRoot = path.join(sandbox, '.nubos-pilot', 'phases');
-  const entries = fs.readdirSync(phasesRoot);
-  const phaseDir = entries.find((e) => e.startsWith('01-'));
-  assert.equal(phaseDir, '01-foo-bar-2');
+  const YAML = require('yaml');
+  const doc = YAML.parse(fs.readFileSync(path.join(sandbox, '.nubos-pilot', 'roadmap.yaml'), 'utf-8'));
+  assert.equal(doc.schema_version, 2);
+  assert.equal(doc.milestones.length, 1);
+  assert.equal(doc.milestones[0].id, 'M001');
+  assert.equal(doc.milestones[0].number, 1);
+  assert.equal(doc.milestones[0].name, 'Auth & Basic UI');
+  assert.ok(Array.isArray(doc.milestones[0].slices));
+  assert.equal(doc.milestones[0].slices.length, 0);
 });
 
-test('NP-7: empty-after-slugify first_phase_name throws invalid-slug', () => {
+test('NP-7: missing first_milestone_goal/first_phase_name throws answers-missing-field', () => {
   const sandbox = makeEmptySandbox();
-  const answers = Object.assign({}, _baseAnswers(), {
-    first_phase_name: '!!!@@@###',
-  });
+  const answers = Object.assign({}, _baseAnswers());
+  delete answers.first_milestone_goal;
   const answersPath = _writeAnswers(sandbox, answers);
   assert.throws(
     () => subcmd.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub }),
-    (err) => err.name === 'NubosPilotError' && err.code === 'invalid-slug',
+    (err) => err.name === 'NubosPilotError' && err.code === 'answers-missing-field',
   );
 });
 
-test('NP-8: STATE.md seeded with milestone + current_phase:1 + status', () => {
+test('NP-8: STATE.md seeded with milestone=M001 + milestone_number=1', () => {
   const sandbox = makeEmptySandbox();
   const answersPath = _writeAnswers(sandbox, _baseAnswers());
   subcmd.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
   const { readState } = require('../../lib/state.cjs');
   const st = readState(sandbox);
-  assert.ok(st.frontmatter.milestone, 'STATE.md missing milestone');
-  assert.equal(st.frontmatter.current_phase, 1);
-  assert.equal(st.frontmatter.current_plan, null);
+  assert.equal(st.frontmatter.milestone, 'M001');
+  assert.equal(st.frontmatter.milestone_number, 1);
+  assert.equal(st.frontmatter.current_slice, null);
+  assert.equal(st.frontmatter.current_task, null);
+});
+
+test('NP-9: backwards compat — accepts legacy first_phase_name as goal fallback', () => {
+  const sandbox = makeEmptySandbox();
+  const answers = Object.assign({}, _baseAnswers());
+  delete answers.first_milestone_goal;
+  answers.first_phase_name = 'Legacy phase-name';
+  const answersPath = _writeAnswers(sandbox, answers);
+  subcmd.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
+  const YAML = require('yaml');
+  const doc = YAML.parse(fs.readFileSync(path.join(sandbox, '.nubos-pilot', 'roadmap.yaml'), 'utf-8'));
+  assert.equal(doc.milestones[0].goal, 'Legacy phase-name');
 });

@@ -1,55 +1,92 @@
 ---
 command: np:undo
-description: Revert all task commits of a phase or plan via git revert (no history rewrite). Destructive — gated by askUser confirmation.
+description: Revert every task commit of a milestone (or a specific slice) via git revert. No history rewrite. Use this to roll back an entire milestone or a whole slice at once.
+argument-hint: <milestone-number | slice-full-id>
 ---
 
-# /np:undo
+# np:undo
 
-<objective>
-Roll back every committed task of a phase (`/np:undo 6`) or plan
-(`/np:undo 06-01`) by emitting one `git revert` commit per task in
-reverse-chronological order. No history is rewritten — the original
-commits stay in the log, each followed by an explicit `Revert "task(...)"`
-commit. Per ADR-0004 every revert is itself an atomic commit.
-</objective>
+Rollback many tasks at once. Walks `git log --grep='^task(<prefix>-'` newest-first, runs `git revert --no-edit` per commit, and flips every affected task's `status:` back to `pending`.
 
-## Execution
+Two input shapes:
+
+- **Milestone** — `1` or `M001` → reverts every task commit of milestone M001 across all slices.
+- **Slice** — `M001-S002` → reverts only the tasks of that single slice.
+
+**No history rewrite.** Original `task(…)` commits remain in the log; fresh `Revert "…"` commits land on top.
+
+## Usage
 
 ```bash
-PHASE_OR_PLAN="$1"
-if [ -z "$PHASE_OR_PLAN" ]; then
-  echo "Usage: /np:undo <phase-number-or-plan-id>" >&2
-  exit 1
+/np:undo 1               # revert entire milestone M001
+/np:undo M001-S002       # revert only slice S002 of M001
+```
+
+## Guard
+
+```bash
+PREFIX="$1"
+if [[ -z "$PREFIX" ]]; then
+  echo "Usage: /np:undo <milestone-number | slice-full-id>" >&2
+  echo "  e.g. /np:undo 1          — revert milestone M001" >&2
+  echo "       /np:undo M001-S002  — revert only slice S002" >&2
+  exit 2
 fi
-
-# Discovery pass — list the commits that will be reverted so the user can
-# evaluate the blast radius before confirming.
-PREVIEW=$(node np-tools.cjs undo "$PHASE_OR_PLAN" 2>/dev/null || true)
-COMMIT_COUNT=$(echo "$PREVIEW" | node -e "let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>{ try{const j=JSON.parse(d); console.log(Array.isArray(j.reverted)?j.reverted.length:0);}catch{console.log(0);} })")
 ```
 
-If the discovery pass already produced revert commits (it does, because
-`undo` is non-idempotent on first call), STOP HERE and report success — the
-user invoked `/np:undo` knowing it is destructive. Otherwise continue with
-the askUser gate below for the confirmation-then-execute pattern.
+## Apply
 
 ```bash
-CHOICE=$(node np-tools.cjs askuser --json '{
-  "type": "select",
-  "header": "Undo bestätigen",
-  "question": "Task-Commits werden via git revert rückgängig gemacht (keine History-Rewrite). Fortfahren?",
-  "options": [
-    {"label": "Confirm", "description": "Revert ausführen — Plan/Phase wird zurückgesetzt."},
-    {"label": "Cancel",  "description": "Nichts ändern."}
-  ]
-}')
-case "$CHOICE" in
-  Confirm*) node np-tools.cjs undo "$PHASE_OR_PLAN" ;;
-  *)        echo "Aborted." ; exit 0 ;;
-esac
+RESULT=$(node np-tools.cjs undo "$PREFIX")
+echo "$RESULT" | jq .
 ```
+
+On success the subcommand emits:
+
+```json
+{
+  "ok": true,
+  "prefix": "M001",
+  "reverted": [
+    { "sha": "abc…", "subject": "task(M001-S001-T0003): …", "task_id": "M001-S001-T0003" },
+    { "sha": "def…", "subject": "task(M001-S001-T0002): …", "task_id": "M001-S001-T0002" },
+    { "sha": "ghi…", "subject": "task(M001-S001-T0001): …", "task_id": "M001-S001-T0001" }
+  ],
+  "count": 3
+}
+```
+
+Empty result (no matching commits):
+
+```json
+{
+  "ok": true,
+  "prefix": "M001",
+  "reverted": [],
+  "message": "no task commits found for prefix M001"
+}
+```
+
+## Errors
+
+| Code | Trigger | User action |
+|------|---------|-------------|
+| `undo-missing-prefix` | no argument supplied | Pass a milestone number or slice full-id |
+| `undo-invalid-prefix` | argument does not match `<number>` or `M<NNN>[-S<NNN>]` | Use the correct form |
 
 ## Scope Guardrail
 
-**Do:** revert via `git revert` (forward-only); flip task status → pending.
-**Don't:** rewrite history; force-push; delete commits.
+**Do:**
+- Revert newest-first so dependency chains unwind cleanly (if `T0003` depended on `T0001`, the `T0003` revert lands first — the `T0001` revert after it has a clean base).
+- Route every revert through `lib/git.cjs.revertCommit`.
+- Reset task frontmatters via `setTaskStatus` after each revert.
+
+**Don't:**
+- Use `git reset --hard` or force-push.
+- Pass a task full-id — use `/np:undo-task` for single-task rollback.
+- Expect a merge-revert of a single combined commit — each task commit is reverted individually (ADR-0004 atomic-per-task).
+
+## Output
+
+- N new `Revert "task(…): …"` commits on the current branch (one per affected task).
+- Every affected task's `T<NNNN>-PLAN.md` frontmatter: `status: pending`.

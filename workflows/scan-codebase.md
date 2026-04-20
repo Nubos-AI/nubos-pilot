@@ -1,6 +1,7 @@
 ---
 command: np:scan-codebase
 description: Initial deep codebase scan — inventories files, groups them into coherent modules, writes skill-style docs under .nubos-pilot/codebase/ that dev-agents must read before touching code.
+argument-hint: [--batch-size <N>] [--max-files <N>] [--module <id>] [--project-name <name>]
 ---
 
 # np:scan-codebase

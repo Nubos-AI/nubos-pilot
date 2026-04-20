@@ -56,18 +56,18 @@ test('RW-1: clean when no state, no checkpoints', () => {
 });
 
 test('RW-2: resume when current_task matches an in-progress checkpoint', () => {
-  const root = makeRoot('06-01-T01');
-  startTask({ id: '06-01-T01', phase: 6, plan: '06-01', wave: 1 }, root);
+  const root = makeRoot('M006-S001-T0001');
+  startTask({ id: 'M006-S001-T0001', phase: 6, plan: '06-01', wave: 1 }, root);
   const cap = _capture();
   const p = subcmd.run([], { cwd: root, stdout: cap.stub });
   assert.equal(p.status, 'resume');
-  assert.equal(p.task_id, '06-01-T01');
+  assert.equal(p.task_id, 'M006-S001-T0001');
   assert.equal(p.checkpoint.status, 'in-progress');
 });
 
 test('RW-3: orphan when checkpoint files exist but no matching STATE.current_task', () => {
   const root = makeRoot(null);
-  startTask({ id: '06-01-T05', phase: 6, plan: '06-01', wave: 1 }, root);
+  startTask({ id: 'M006-S001-T0005', phase: 6, plan: '06-01', wave: 1 }, root);
 
   const statePath = path.join(root, '.nubos-pilot', 'STATE.md');
   const body = fs.readFileSync(statePath, 'utf-8').replace(/current_task:.*/, 'current_task: null');
@@ -75,14 +75,14 @@ test('RW-3: orphan when checkpoint files exist but no matching STATE.current_tas
   const cap = _capture();
   const p = subcmd.run([], { cwd: root, stdout: cap.stub });
   assert.equal(p.status, 'orphan');
-  assert.ok(p.checkpoint_ids.includes('06-01-T05'));
+  assert.ok(p.checkpoint_ids.includes('M006-S001-T0005'));
 });
 
 test('RW-4: malformed checkpoint → checkpoint-schema-mismatch (T-06-12)', () => {
-  const root = makeRoot('06-01-T09');
+  const root = makeRoot('M006-S001-T0009');
   const cpDir = path.join(root, '.nubos-pilot', 'checkpoints');
   fs.mkdirSync(cpDir, { recursive: true });
-  fs.writeFileSync(path.join(cpDir, '06-01-T09.json'), JSON.stringify({ schema_version: 99, task_id: '06-01-T09' }), 'utf-8');
+  fs.writeFileSync(path.join(cpDir, 'M006-S001-T0009.json'), JSON.stringify({ schema_version: 99, task_id: 'M006-S001-T0009' }), 'utf-8');
   const cap = _capture();
   assert.throws(
     () => subcmd.run([], { cwd: root, stdout: cap.stub }),

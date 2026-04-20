@@ -1,6 +1,7 @@
 ---
 command: np:discuss-project
 description: Project-level discovery — adaptive interview that fills (bootstrap) or refreshes (refresh) PROJECT.md sections (Domain, Target Users, Non-Goals, Success Criteria, Strategic Decisions) and proposes REQ candidates.
+argument-hint: [--bootstrap|--refresh]
 ---
 
 # np:discuss-project

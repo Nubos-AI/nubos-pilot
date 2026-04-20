@@ -1,6 +1,7 @@
 ---
 command: np:thread
 description: Create or resume a cross-session thread at .nubos-pilot/threads/<slug>.md. Lifecycle status OPEN → IN_PROGRESS (auto on resume) → RESOLVED (user edits manually, no close command per D-19 Claude's Discretion). No agent spawn. Project-scope only.
+argument-hint: <slug-or-title>
 ---
 
 # np:thread
@@ -41,8 +42,8 @@ TODAY=$(date +%Y-%m-%d)
 mkdir -p "$THREADS_DIR"
 ```
 
-Slug via `generate-slug` (wraps `lib/phase.cjs.phaseSlug`) — only
-`[a-z0-9-]` enters the filename; closes T-10-06-01 (path traversal).
+Slug via `generate-slug` (wraps `lib/layout.cjs.slugify`) — only
+`[a-z0-9-]` enters the filename; prevents path traversal.
 
 ## Create vs Resume Branch
 
@@ -160,7 +161,7 @@ Echo `Thread <MODE>d: <THREAD_PATH>` with slug/mode/today to stdout.
 
 <scope_guardrail>
 **Do:**
-- Use `phaseSlug`-generated slug (T-10-06-01 mitigation).
+- Use `slugify`-generated slug (prevents path traversal).
 - Preserve status monotonicity on resume: `OPEN → IN_PROGRESS` only.
 - Let the user manually flip `status: RESOLVED` (D-19 — no close
   command in this adapted port).

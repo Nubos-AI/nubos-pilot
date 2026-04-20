@@ -1,27 +1,5 @@
-const fs = require('node:fs');
-const path = require('node:path');
-
-const { NubosPilotError, projectStateDir } = require('../../lib/core.cjs');
+const { NubosPilotError } = require('../../lib/core.cjs');
 const { TASK_ID_RE, setTaskStatus } = require('../../lib/tasks.cjs');
-
-function _findPlanDirForTask(taskId, cwd) {
-  const phasesRoot = path.join(projectStateDir(cwd), 'phases');
-  let entries;
-  try {
-    entries = fs.readdirSync(phasesRoot, { withFileTypes: true });
-  } catch (err) {
-    if (err && err.code === 'ENOENT') return null;
-    throw err;
-  }
-  const padded = taskId.slice(0, 2);
-  for (const e of entries) {
-    if (!e.isDirectory()) continue;
-    if (!(e.name === padded || e.name.startsWith(padded + '-'))) continue;
-    const candidate = path.join(phasesRoot, e.name, 'tasks', taskId + '.md');
-    if (fs.existsSync(candidate)) return path.join(phasesRoot, e.name);
-  }
-  return null;
-}
 
 function run(args, ctx) {
   const context = ctx || {};
@@ -30,16 +8,12 @@ function run(args, ctx) {
   const list = Array.isArray(args) ? args : [];
   const taskId = list[0];
   if (!taskId) {
-    throw new NubosPilotError('skip-missing-task-id', 'skip requires a task id', {});
+    throw new NubosPilotError('skip-missing-task-id', 'skip requires a task full-id (e.g. M001-S001-T0001)', {});
   }
   if (!TASK_ID_RE.test(taskId)) {
-    throw new NubosPilotError('skip-invalid-task-id', 'Invalid task id: ' + taskId, { taskId });
+    throw new NubosPilotError('skip-invalid-task-id', 'Invalid task id: ' + taskId + ' (expected M<NNN>-S<NNN>-T<NNNN>)', { taskId });
   }
-  const planDir = _findPlanDirForTask(taskId, cwd);
-  if (!planDir) {
-    throw new NubosPilotError('task-not-found', 'No task file found for id ' + taskId, { taskId });
-  }
-  setTaskStatus(taskId, 'skipped', planDir);
+  setTaskStatus(taskId, 'skipped', cwd);
   const payload = { ok: true, task_id: taskId, status: 'skipped' };
   stdout.write(JSON.stringify(payload));
   return payload;

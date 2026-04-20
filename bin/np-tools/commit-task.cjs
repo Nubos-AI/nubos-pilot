@@ -4,39 +4,22 @@ const path = require('node:path');
 const { NubosPilotError, findProjectRoot } = require('../../lib/core.cjs');
 const { extractFrontmatter } = require('../../lib/frontmatter.cjs');
 const { TASK_ID_RE, setTaskStatus } = require('../../lib/tasks.cjs');
+const layout = require('../../lib/layout.cjs');
 const git = require('../../lib/git.cjs');
 const { commitTask, findCommitByTaskId } = git;
 const { deleteCheckpoint } = require('../../lib/checkpoint.cjs');
 
 function _resolveTaskFile(taskId, cwd) {
-
-  const root = findProjectRoot(cwd);
-  const phasesRoot = path.join(root, '.nubos-pilot', 'phases');
-  let entries;
-  try {
-    entries = fs.readdirSync(phasesRoot, { withFileTypes: true });
-  } catch (err) {
-    if (err && err.code === 'ENOENT') {
-      throw new NubosPilotError(
-        'commit-task-not-found',
-        'No .nubos-pilot/phases directory found',
-        { taskId, cwd },
-      );
-    }
-    throw err;
+  const parsed = layout.parseTaskFullId(taskId);
+  const filePath = layout.taskPlanPath(parsed.milestone, parsed.slice, parsed.task, cwd);
+  if (!fs.existsSync(filePath)) {
+    throw new NubosPilotError(
+      'commit-task-not-found',
+      'No task file found for id ' + taskId + ' at ' + filePath,
+      { taskId, path: filePath },
+    );
   }
-  const padded = taskId.slice(0, 2);
-  for (const e of entries) {
-    if (!e.isDirectory()) continue;
-    if (!(e.name === padded || e.name.startsWith(padded + '-'))) continue;
-    const candidate = path.join(phasesRoot, e.name, 'tasks', taskId + '.md');
-    if (fs.existsSync(candidate)) return { filePath: candidate, planDir: path.join(phasesRoot, e.name) };
-  }
-  throw new NubosPilotError(
-    'commit-task-not-found',
-    'No task file found for id ' + taskId,
-    { taskId },
-  );
+  return { filePath };
 }
 
 function _resolveSafe(root, p) {
@@ -72,19 +55,19 @@ function run(args, ctx) {
   if (!taskId) {
     throw new NubosPilotError(
       'commit-task-missing-id',
-      'commit-task requires a task id (e.g. 06-01-T01)',
+      'commit-task requires a task full-id (e.g. M001-S001-T0001)',
       {},
     );
   }
   if (!TASK_ID_RE.test(taskId)) {
     throw new NubosPilotError(
       'commit-task-invalid-id',
-      'Invalid task id format: ' + taskId + ' (expected <NN-NN-TNN>)',
+      'Invalid task id format: ' + taskId + ' (expected M<NNN>-S<NNN>-T<NNNN>)',
       { taskId },
     );
   }
 
-  const { filePath, planDir } = _resolveTaskFile(taskId, cwd);
+  const { filePath } = _resolveTaskFile(taskId, cwd);
   const raw = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = extractFrontmatter(raw);
   const files = Array.isArray(frontmatter.files_modified) ? frontmatter.files_modified : [];
@@ -106,9 +89,7 @@ function run(args, ctx) {
   const sha = findCommitByTaskId(taskId);
 
   try { deleteCheckpoint(taskId, cwd); } catch {  }
-  try { setTaskStatus(taskId, 'done', planDir); } catch (err) {
-
-    
+  try { setTaskStatus(taskId, 'done', cwd); } catch (err) {
     process.stderr.write('[nubos-pilot warn] setTaskStatus failed for ' + taskId + ': ' + (err && err.message) + '\n');
   }
 

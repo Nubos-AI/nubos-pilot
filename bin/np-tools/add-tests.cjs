@@ -3,65 +3,61 @@ const path = require('node:path');
 
 const { NubosPilotError, atomicWriteFileSync, withFileLock } = require('../../lib/core.cjs');
 const { getPhase } = require('../../lib/roadmap.cjs');
-const { paddedPhase, phaseSlug, findPhaseDir } = require('../../lib/phase.cjs');
-const { parseVerificationMd } = require('../../lib/verify.cjs');
+const layout = require('../../lib/layout.cjs');
+const { parseVerificationMd, milestoneVerificationPath } = require('../../lib/verify.cjs');
 
 const BEGIN_MARKER = '// >>> np:add-tests begin';
 const END_MARKER = '// <<< np:add-tests end';
 
-function _validatePhaseArg(raw) {
-  if (raw == null || raw === '' || !/^\d+(\.\d+)?$/.test(String(raw))) {
+function _validateMilestoneArg(raw) {
+  if (raw == null || raw === '' || !/^\d+$/.test(String(raw))) {
     throw new NubosPilotError(
       'add-tests-invalid-phase',
-      'add-tests requires a numeric phase argument',
+      'add-tests requires a positive integer milestone argument',
       { value: raw == null ? '' : String(raw) },
     );
   }
-  return String(raw);
+  return Number(raw);
 }
 
-function _resolveTestTarget(phaseArg, cwd) {
-  const phaseN = Number(phaseArg);
-  const phase = getPhase(phaseN, cwd);
-  const slug = phase.slug || phaseSlug(phase.name);
-  const padded = paddedPhase(phaseN);
+function _resolveTestTarget(mNum, cwd) {
+  const def = getPhase(mNum, cwd);
+  const slug = layout.slugify(def.name || 'milestone');
+  const mIdStr = layout.mId(mNum);
   let dir = path.resolve(cwd);
   for (let i = 0; i < 10; i++) {
     if (fs.existsSync(path.join(dir, 'package.json'))) {
       return {
         pkg_root: dir,
-        target_path: path.join(dir, 'test', 'uat', 'phase-' + padded + '-' + slug + '.test.cjs'),
-        padded, slug,
+        target_path: path.join(dir, 'test', 'uat', mIdStr.toLowerCase() + '-' + slug + '.test.cjs'),
+        milestone_id: mIdStr, slug,
       };
     }
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-
   return {
     pkg_root: path.resolve(cwd),
-    target_path: path.join(path.resolve(cwd), 'test', 'uat', 'phase-' + padded + '-' + slug + '.test.cjs'),
-    padded, slug,
+    target_path: path.join(path.resolve(cwd), 'test', 'uat', mIdStr.toLowerCase() + '-' + slug + '.test.cjs'),
+    milestone_id: mIdStr, slug,
   };
 }
 
-function _loadCases(phaseArg, cwd) {
-  const phaseN = Number(phaseArg);
-  const padded = paddedPhase(phaseN);
-  const phase_dir = findPhaseDir(phaseN, cwd);
-  if (!phase_dir) {
+function _loadCases(mNum, cwd) {
+  const mDir = layout.findMilestoneDir(mNum, cwd);
+  if (!mDir) {
     throw new NubosPilotError(
       'add-tests-phase-dir-missing',
-      'Phase directory not found for phase ' + phaseN,
-      { phase: phaseN },
+      'Milestone directory not found for milestone ' + mNum,
+      { milestone: mNum },
     );
   }
-  const vp = path.join(phase_dir, padded + '-VERIFICATION.md');
+  const vp = milestoneVerificationPath(mNum, cwd);
   if (!fs.existsSync(vp)) {
     throw new NubosPilotError(
       'add-tests-verification-missing',
-      'VERIFICATION.md not found — run `/np:verify-work ' + phaseArg + '` first',
+      'VERIFICATION.md not found — run `/np:verify-work ' + mNum + '` first',
       { path: vp },
     );
   }
@@ -75,10 +71,10 @@ function _jsString(s) {
   return "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n') + "'";
 }
 
-function _renderBlock(phasePadded, passes, skips) {
+function _renderBlock(milestoneId, passes, skips) {
   const date = new Date().toISOString().slice(0, 10);
   const lines = [];
-  lines.push(BEGIN_MARKER + ' (phase ' + phasePadded + ', generated ' + date + ')');
+  lines.push(BEGIN_MARKER + ' (' + milestoneId + ', generated ' + date + ')');
   lines.push("const { test } = require('node:test');");
   lines.push("const assert = require('node:assert');");
   lines.push('');
@@ -111,11 +107,11 @@ function _mergeBlock(existing, block) {
   return before + block + after;
 }
 
-function _emitTests(phaseArg, cwd) {
-  const { passes, skips } = _loadCases(phaseArg, cwd);
-  const target = _resolveTestTarget(phaseArg, cwd);
+function _emitTests(mNum, cwd) {
+  const { passes, skips } = _loadCases(mNum, cwd);
+  const target = _resolveTestTarget(mNum, cwd);
   fs.mkdirSync(path.dirname(target.target_path), { recursive: true });
-  const block = _renderBlock(target.padded, passes, skips);
+  const block = _renderBlock(target.milestone_id, passes, skips);
   return withFileLock(target.target_path, () => {
     let existing = null;
     try { existing = fs.readFileSync(target.target_path, 'utf-8'); } catch { existing = null; }
@@ -139,12 +135,13 @@ function run(args, ctx) {
 
   switch (verb) {
     case 'init': {
-      const phaseArg = _validatePhaseArg(list[1]);
-      const target = _resolveTestTarget(phaseArg, cwd);
-      const { passes, skips, verification_path } = _loadCases(phaseArg, cwd);
+      const mNum = _validateMilestoneArg(list[1]);
+      const target = _resolveTestTarget(mNum, cwd);
+      const { passes, skips, verification_path } = _loadCases(mNum, cwd);
       const payload = {
         _workflow: 'add-tests',
-        phase: phaseArg,
+        milestone: mNum,
+        milestone_id: target.milestone_id,
         target_path: target.target_path,
         verification_path,
         pass_cases: passes,
@@ -154,8 +151,8 @@ function run(args, ctx) {
       return payload;
     }
     case 'emit': {
-      const phaseArg = _validatePhaseArg(list[1]);
-      const result = _emitTests(phaseArg, cwd);
+      const mNum = _validateMilestoneArg(list[1]);
+      const result = _emitTests(mNum, cwd);
       stdout.write(JSON.stringify(result));
       return result;
     }

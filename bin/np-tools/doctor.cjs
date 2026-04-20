@@ -243,6 +243,68 @@ function _checkCodebaseDocs(projectRoot) {
   return issues;
 }
 
+function _checkMilestoneLayout(projectRoot) {
+  const stateDir = path.join(projectRoot, '.nubos-pilot');
+  const roadmapPath = path.join(stateDir, 'roadmap.yaml');
+  if (!fs.existsSync(roadmapPath)) return [];
+  let doc;
+  try {
+    const YAML = require('yaml');
+    doc = YAML.parse(fs.readFileSync(roadmapPath, 'utf-8'));
+  } catch {
+    return [{
+      id: 'roadmap-unreadable',
+      severity: 'error',
+      fixable: 'manual',
+      details: { path: roadmapPath, hint: 'check roadmap.yaml syntax' },
+    }];
+  }
+  if (!doc || !Array.isArray(doc.milestones)) return [];
+
+  const issues = [];
+  const milestonesRoot = path.join(stateDir, 'milestones');
+  for (const m of doc.milestones) {
+    if (!m || m.id === 'backlog') continue;
+    const id = typeof m.id === 'string' ? m.id : null;
+    if (!id || !/^M\d{3,}$/.test(id)) continue;
+    const mDir = path.join(milestonesRoot, id);
+    if (!fs.existsSync(mDir)) {
+      issues.push({
+        id: 'milestone-dir-missing',
+        severity: 'warn',
+        fixable: 'run-workflow',
+        details: { milestone: id, expected: mDir, hint: 'run `/np:plan-phase ' + (m.number || '') + '` to scaffold it' },
+      });
+      continue;
+    }
+    const slicesDir = path.join(mDir, 'slices');
+    if (!Array.isArray(m.slices) || m.slices.length === 0) continue;
+    if (!fs.existsSync(slicesDir)) {
+      issues.push({
+        id: 'milestone-slices-dir-missing',
+        severity: 'warn',
+        fixable: 'run-workflow',
+        details: { milestone: id, expected: slicesDir },
+      });
+    }
+  }
+
+  // Flag old .nubos-pilot/phases/ dir as stale if still present
+  const phasesDir = path.join(stateDir, 'phases');
+  if (fs.existsSync(phasesDir)) {
+    issues.push({
+      id: 'legacy-phases-dir',
+      severity: 'info',
+      fixable: 'manual',
+      details: {
+        path: phasesDir,
+        hint: 'legacy v1 layout detected; safe to remove after /np:plan-phase has scaffolded milestones/',
+      },
+    });
+  }
+  return issues;
+}
+
 function _audit(projectRoot) {
   const payloadDir = _payloadDirFor(projectRoot);
   const issues = [];
@@ -254,6 +316,7 @@ function _audit(projectRoot) {
   issues.push(...codex.issues);
   issues.push(..._checkAskUserBroken());
   issues.push(..._checkCodebaseDocs(projectRoot));
+  issues.push(..._checkMilestoneLayout(projectRoot));
   return { issues, _codexContent: codex.content };
 }
 

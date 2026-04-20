@@ -11,16 +11,18 @@ const _roots = [];
 function makeRoot(taskId) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'np-unpark-'));
   fs.mkdirSync(path.join(root, '.nubos-pilot'), { recursive: true });
-  const tasksDir = path.join(root, '.nubos-pilot', 'phases', '06-demo', 'tasks');
-  fs.mkdirSync(tasksDir, { recursive: true });
-  fs.writeFileSync(path.join(tasksDir, taskId + '.md'), [
-    '---', `id: ${taskId}`, 'phase: 6', 'plan: "06-01"', 'type: auto',
+  const m = taskId.match(/^(M\d{3,})-(S\d{3,})-(T\d{4,})$/);
+  const [, mId, sId, tId] = m;
+  const taskDir = path.join(root, '.nubos-pilot', 'milestones', mId, 'slices', sId, 'tasks', tId);
+  fs.mkdirSync(taskDir, { recursive: true });
+  fs.writeFileSync(path.join(taskDir, tId + '-PLAN.md'), [
+    '---', `id: ${taskId}`, `milestone: ${mId}`, `slice: ${mId}-${sId}`, 'type: execute',
     'status: parked', 'tier: sonnet', 'owner: np-executor', 'wave: 1',
     'depends_on: []', 'files_modified: []', 'autonomous: true',
     'must_haves:', '  truths: []', '---', '', '# T',
   ].join('\n'), 'utf-8');
   _roots.push(root);
-  return root;
+  return { root, taskFile: path.join(taskDir, tId + '-PLAN.md') };
 }
 
 function _capture() { let b = ''; return { stub: { write: (s) => { b += s; } }, get: () => b }; }
@@ -40,11 +42,10 @@ test('UP-1: unpark missing id', () => {
 });
 
 test('UP-2: unpark flips status to pending', () => {
-  const root = makeRoot('06-01-T03');
+  const { root, taskFile } = makeRoot('M006-S001-T0003');
   const cap = _capture();
-  subcmd.run(['06-01-T03'], { cwd: root, stdout: cap.stub });
+  subcmd.run(['M006-S001-T0003'], { cwd: root, stdout: cap.stub });
   const payload = JSON.parse(cap.get());
   assert.equal(payload.status, 'pending');
-  const tf = path.join(root, '.nubos-pilot', 'phases', '06-demo', 'tasks', '06-01-T03.md');
-  assert.match(fs.readFileSync(tf, 'utf-8'), /^status: pending$/m);
+  assert.match(fs.readFileSync(taskFile, 'utf-8'), /^status: pending$/m);
 });

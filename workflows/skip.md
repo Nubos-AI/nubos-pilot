@@ -1,6 +1,7 @@
 ---
 command: np:skip
 description: Mark a task as skipped (lifecycle CRUD). The task is excluded from wave-selection until it is unparked or its status is set back to pending.
+argument-hint: <task-id>
 ---
 
 # /np:skip

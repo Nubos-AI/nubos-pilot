@@ -1,3 +1,5 @@
+'use strict';
+
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -10,26 +12,26 @@ const {
   withFileLock,
 } = require('../../lib/core.cjs');
 const { getPhase } = require('../../lib/roadmap.cjs');
-const { paddedPhase, findPhaseDir } = require('../../lib/phase.cjs');
+const layout = require('../../lib/layout.cjs');
 const {
-  verifyPhase,
-  renderVerificationMd,
+  verifyMilestone,
   writeVerificationMd,
+  milestoneVerificationPath,
 } = require('../../lib/verify.cjs');
 const { getAgentSkills } = require('../../lib/agents.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 const _VALID_SC_STATUSES = new Set(['Pass', 'Fail', 'Defer', 'Pending']);
 
-function _validatePhaseArg(raw) {
-  if (raw == null || raw === '' || !/^\d+(\.\d+)?$/.test(String(raw))) {
+function _validateMilestoneArg(raw) {
+  if (raw == null || raw === '' || !/^\d+$/.test(String(raw))) {
     throw new NubosPilotError(
       'verify-work-invalid-phase',
-      'verify-work requires a numeric phase argument',
+      'verify-work requires a positive integer milestone argument',
       { value: raw == null ? '' : String(raw) },
     );
   }
-  return String(raw);
+  return Number(raw);
 }
 
 function _safeSkills(name, cwd) {
@@ -53,35 +55,62 @@ function _emit(payload, stdout, cwd) {
   stdout.write('@file:' + tmpPath);
 }
 
-function _initPayload(phaseArg, cwd) {
-  const phaseN = Number(phaseArg);
-  const phase = getPhase(phaseN, cwd);
-  const padded = paddedPhase(phaseN);
-  const phase_dir = findPhaseDir(phaseN, cwd);
-  const results = verifyPhase(phaseN, { cwd });
+function _initPayload(mNum, cwd) {
+  let def;
+  try {
+    def = getPhase(mNum, cwd);
+  } catch (err) {
+    if (err && err.code === 'phase-not-found') {
+      throw new NubosPilotError(
+        'verify-work-not-found',
+        'Milestone ' + mNum + ' not found in roadmap.yaml',
+        { number: mNum },
+      );
+    }
+    throw err;
+  }
+  const mDir = layout.milestoneDir(mNum, cwd);
+  const results = verifyMilestone(mNum, { cwd });
+  const verificationPath = milestoneVerificationPath(mNum, cwd);
+
+  // Collect slice UAT coverage
+  const slices = layout.listSlices(mNum, cwd);
+  const sliceUat = slices.map((s) => {
+    const uatPath = layout.sliceUatPath(mNum, s.number, cwd);
+    const summaryPath = layout.sliceSummaryPath(mNum, s.number, cwd);
+    const tasks = layout.listTasks(mNum, s.number, cwd);
+    return {
+      id: s.id,
+      full_id: s.full_id,
+      uat_path: uatPath,
+      summary_path: summaryPath,
+      has_uat: fs.existsSync(uatPath),
+      has_summary: fs.existsSync(summaryPath),
+      task_count: tasks.length,
+    };
+  });
+
   return {
     _workflow: 'verify-work',
-    phase: phaseArg,
-    padded,
-    phase_dir,
-    phase_name: phase.name,
-    success_criteria: Array.isArray(phase.success_criteria) ? phase.success_criteria : [],
+    milestone: mNum,
+    milestone_id: layout.mId(mNum),
+    milestone_dir: mDir,
+    milestone_name: def.name,
+    success_criteria: Array.isArray(def.success_criteria) ? def.success_criteria : [],
     draft_results: results,
-    verification_path: phase_dir ? path.join(phase_dir, padded + '-VERIFICATION.md') : null,
+    verification_path: verificationPath,
+    slice_uat: sliceUat,
     verifier_tier: 'sonnet',
     agent_skills: { verifier: _safeSkills('np-verifier', cwd) },
   };
 }
 
-function _emitDraft(phaseArg, cwd) {
-  const phaseN = Number(phaseArg);
-  writeVerificationMd(phaseN, cwd);
-  const padded = paddedPhase(phaseN);
-  const phase_dir = findPhaseDir(phaseN, cwd);
-  return { ok: true, path: path.join(phase_dir, padded + '-VERIFICATION.md') };
+function _emitDraft(mNum, cwd) {
+  writeVerificationMd(mNum, cwd);
+  return { ok: true, path: milestoneVerificationPath(mNum, cwd) };
 }
 
-function _recordSc(phaseArg, scId, status, notes, cwd) {
+function _recordSc(mNum, scId, status, notes, cwd) {
   if (!/^SC-\d+$/.test(String(scId))) {
     throw new NubosPilotError(
       'verify-work-invalid-sc-id',
@@ -96,17 +125,15 @@ function _recordSc(phaseArg, scId, status, notes, cwd) {
       { status },
     );
   }
-  const phaseN = Number(phaseArg);
-  const padded = paddedPhase(phaseN);
-  const phase_dir = findPhaseDir(phaseN, cwd);
-  if (!phase_dir) {
+  const mDir = layout.findMilestoneDir(mNum, cwd);
+  if (!mDir) {
     throw new NubosPilotError(
-      'verify-work-phase-dir-missing',
-      'Phase directory not found for phase ' + phaseN,
-      { phase: phaseN },
+      'verify-work-milestone-dir-missing',
+      'Milestone directory not found for milestone ' + mNum,
+      { milestone: mNum },
     );
   }
-  const target = path.join(phase_dir, padded + '-VERIFICATION.md');
+  const target = milestoneVerificationPath(mNum, cwd);
 
   return withFileLock(target, () => {
     let raw;
@@ -118,7 +145,6 @@ function _recordSc(phaseArg, scId, status, notes, cwd) {
       );
     }
 
-    
     const blockRe = new RegExp(
       '^(### ' + scId + ':[^\\n]*\\n)(- \\*\\*Status:\\*\\* )[^\\n]*(\\n- \\*\\*Classified by:\\*\\* )[^\\n]*',
       'm',
@@ -132,7 +158,6 @@ function _recordSc(phaseArg, scId, status, notes, cwd) {
     }
     let next = raw.replace(blockRe, (_m, hdr, p1, p3) => hdr + p1 + status + p3 + 'user');
 
-    
     if (notes) {
       const afterRe = new RegExp(
         '^(### ' + scId + ':[^\\n]*\\n- \\*\\*Status:\\*\\* [^\\n]*\\n- \\*\\*Classified by:\\*\\* [^\\n]*\\n- \\*\\*Evidence:\\*\\* [^\\n]*)(\\n- \\*\\*Notes:\\*\\* [^\\n]*)?',
@@ -154,23 +179,23 @@ function run(args, ctx) {
 
   switch (verb) {
     case 'init': {
-      const phaseArg = _validatePhaseArg(list[1]);
-      const payload = _initPayload(phaseArg, cwd);
+      const mNum = _validateMilestoneArg(list[1]);
+      const payload = _initPayload(mNum, cwd);
       _emit(payload, stdout, cwd);
       return payload;
     }
     case 'emit-draft': {
-      const phaseArg = _validatePhaseArg(list[1]);
-      const result = _emitDraft(phaseArg, cwd);
+      const mNum = _validateMilestoneArg(list[1]);
+      const result = _emitDraft(mNum, cwd);
       stdout.write(JSON.stringify(result));
       return result;
     }
     case 'record-sc': {
-      const phaseArg = _validatePhaseArg(list[1]);
+      const mNum = _validateMilestoneArg(list[1]);
       const scId = list[2];
       const status = list[3];
       const notes = list.slice(4).join(' ') || null;
-      const result = _recordSc(phaseArg, scId, status, notes, cwd);
+      const result = _recordSc(mNum, scId, status, notes, cwd);
       stdout.write(JSON.stringify(result));
       return result;
     }

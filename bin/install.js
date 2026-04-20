@@ -222,19 +222,18 @@ async function _runInitQuestions(detectedRuntime, askUser, flags) {
   const scope = f.scope || (await askUser({ type: 'select', question: 'Installation scope?',
     options: VALID_SCOPES, default: 'local' })).value;
   const model_profile = (await askUser({ type: 'select', question: 'Model-Profile?',
-    options: ['inherit', 'quality', 'balanced', 'budget'], default: 'inherit' })).value;
-  const commit_docs = (await askUser({ type: 'confirm', question: 'Commit documentation artefacts?', default: true })).value;
-  const branching_strategy = (await askUser({ type: 'select', question: 'Branching strategy?',
-    options: ['single-branch', 'phase-branches', 'milestone-branches'], default: 'single-branch' })).value;
-  const phase_branch_template = (await askUser({ type: 'input', question: 'Phase branch template?', default: 'phase/{number}-{slug}' })).value;
-  const milestone_branch_template = (await askUser({ type: 'input', question: 'Milestone branch template?', default: 'milestone/{name}' })).value;
-  const parallelization = (await askUser({ type: 'confirm', question: 'Enable parallelization?', default: true })).value;
-  const research = (await askUser({ type: 'confirm', question: 'Enable research step?', default: false })).value;
-  const plan_checker = (await askUser({ type: 'confirm', question: 'Enable plan_checker?', default: true })).value;
-  const verifier = (await askUser({ type: 'confirm', question: 'Enable verifier?', default: true })).value;
+    options: ['frontier', 'quality', 'balanced', 'budget', 'inherit'], default: 'frontier' })).value;
   const response_language = (await askUser({ type: 'input', question: 'Response language (ISO-639 code)?', default: 'en' })).value;
-  return { runtime, runtimes, scope, mcp: !!f.mcp, model_profile, commit_docs, branching_strategy, phase_branch_template,
-    milestone_branch_template, parallelization, research, plan_checker, verifier, response_language };
+  return {
+    runtime, runtimes, scope, mcp: !!f.mcp,
+    model_profile,
+    response_language,
+    commit_docs: true,
+    parallelization: true,
+    research: true,
+    plan_checker: true,
+    verifier: true,
+  };
 }
 
 function _repairCodexConfig() {
@@ -251,56 +250,38 @@ function _repairCodexConfig() {
 
 const LEGACY_AGENTS = new Set(['claude', 'codex', 'gemini', 'opencode']);
 
+const DEFAULT_CLAUDE_MD = '# CLAUDE.md\n\n'
+  + 'Project guidance for Claude Code. Add project-specific instructions above the'
+  + ' managed block — `npx nubos-pilot` only rewrites the block between the markers.\n';
+
 function _rewriteManagedMarkdown(projectRoot, runtimes) {
   const claudePath = path.join(projectRoot, 'CLAUDE.md');
   const agentsPath = path.join(projectRoot, 'AGENTS.md');
   const geminiPath = path.join(projectRoot, 'GEMINI.md');
-  const claudeExists = fs.existsSync(claudePath);
-  if (claudeExists) {
-    const content = fs.readFileSync(claudePath, 'utf-8');
-    const next = managedBlockMod.rewriteBlock(content, MANAGED_BLOCK_INNER);
-    atomicWriteFileSync(claudePath, next);
-  }
+  const claudeBase = fs.existsSync(claudePath)
+    ? fs.readFileSync(claudePath, 'utf-8')
+    : DEFAULT_CLAUDE_MD;
+  const claudeNext = managedBlockMod.rewriteBlock(claudeBase, MANAGED_BLOCK_INNER);
+  atomicWriteFileSync(claudePath, claudeNext);
 
-  let agentsBase;
-  if (fs.existsSync(agentsPath)) {
-    agentsBase = fs.readFileSync(agentsPath, 'utf-8');
-  } else if (claudeExists) {
-    agentsBase = agentsMdMod.generateAgentsMd(fs.readFileSync(claudePath, 'utf-8'), 'codex');
-  } else {
-    agentsBase = null;
-  }
-  if (agentsBase !== null) {
-    const agentsNext = managedBlockMod.rewriteBlock(agentsBase, MANAGED_BLOCK_INNER);
-    atomicWriteFileSync(agentsPath, agentsNext);
-  }
+  const agentsBase = fs.existsSync(agentsPath)
+    ? fs.readFileSync(agentsPath, 'utf-8')
+    : agentsMdMod.generateAgentsMd(claudeNext, 'codex');
+  atomicWriteFileSync(agentsPath, managedBlockMod.rewriteBlock(agentsBase, MANAGED_BLOCK_INNER));
 
-  let geminiBase;
-  if (fs.existsSync(geminiPath)) {
-    geminiBase = fs.readFileSync(geminiPath, 'utf-8');
-  } else if (claudeExists) {
-    geminiBase = agentsMdMod.generateAgentsMd(fs.readFileSync(claudePath, 'utf-8'), 'gemini');
-  } else {
-    geminiBase = null;
-  }
-  if (geminiBase !== null) {
-    const geminiNext = managedBlockMod.rewriteBlock(geminiBase, MANAGED_BLOCK_INNER);
-    atomicWriteFileSync(geminiPath, geminiNext);
-  }
+  const geminiBase = fs.existsSync(geminiPath)
+    ? fs.readFileSync(geminiPath, 'utf-8')
+    : agentsMdMod.generateAgentsMd(claudeNext, 'gemini');
+  atomicWriteFileSync(geminiPath, managedBlockMod.rewriteBlock(geminiBase, MANAGED_BLOCK_INNER));
 
   const extras = (runtimes || []).filter((id) => !LEGACY_AGENTS.has(id));
   for (const id of extras) {
     const meta = registryMod.getRuntimeMeta(id);
     if (!meta) continue;
     const targetPath = registryMod.runtimeAgentsPath(meta, 'local', projectRoot);
-    let base;
-    if (fs.existsSync(targetPath)) {
-      base = fs.readFileSync(targetPath, 'utf-8');
-    } else if (claudeExists) {
-      base = agentsMdMod.generateAgentsMd(fs.readFileSync(claudePath, 'utf-8'), 'codex');
-    } else {
-      base = '';
-    }
+    const base = fs.existsSync(targetPath)
+      ? fs.readFileSync(targetPath, 'utf-8')
+      : agentsMdMod.generateAgentsMd(claudeNext, 'codex');
     const next = managedBlockMod.rewriteBlock(base, MANAGED_BLOCK_INNER);
     fs.mkdirSync(path.dirname(targetPath), { recursive: true });
     atomicWriteFileSync(targetPath, next);

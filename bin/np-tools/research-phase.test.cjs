@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { makeSandbox, seedRoadmapYaml, seedPhaseDir, cleanupAll } =
+const { makeSandbox, seedRoadmapYaml, cleanupAll } =
   require('../../tests/helpers/fixture.cjs');
 const subcmd = require('./research-phase.cjs');
 
@@ -12,32 +12,23 @@ function _baseRoadmap() {
     schema_version: 1,
     milestones: [
       {
-        id: 'v1.0',
-        name: 'first',
-        phases: [
-          {
-            number: 3,
-            name: 'Three',
-            slug: 'three',
-            goal: 'Goal of phase 3',
-            depends_on: [],
-            requirements: ['R-1', 'R-2'],
-            success_criteria: ['SC-1'],
-            status: 'pending',
-            plans: [],
-          },
-          {
-            number: 5,
-            name: 'Five',
-            slug: 'five-planning',
-            goal: 'Goal of phase 5',
-            depends_on: [4],
-            requirements: ['PLAN-03'],
-            success_criteria: [],
-            status: 'pending',
-            plans: [],
-          },
-        ],
+        id: 'M003',
+        number: 3,
+        name: 'Three',
+        goal: 'Goal of milestone 3',
+        requirements: ['R-1', 'R-2'],
+        success_criteria: ['SC-1'],
+        status: 'pending',
+        slices: [],
+      },
+      {
+        id: 'M005',
+        number: 5,
+        name: 'Five',
+        goal: 'Goal of milestone 5',
+        requirements: ['PLAN-03'],
+        status: 'pending',
+        slices: [],
       },
     ],
   };
@@ -59,29 +50,32 @@ afterEach(() => {
   cleanupAll();
 });
 
-test('RP-1: run(["3"]) on phase 3 returns payload with all required keys', () => {
+test('RP-1: run(["3"]) on milestone 3 returns payload with all required keys', () => {
   const sandbox = makeSandbox();
   seedRoadmapYaml(sandbox, _baseRoadmap());
-  seedPhaseDir(sandbox, 3, 'three', {});
   const cap = _captureStdout();
   subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
   const payload = JSON.parse(cap.get().trim());
-  assert.equal(payload.phase, 3);
-  assert.equal(payload.padded, '03');
-  assert.ok(payload.phase_dir.endsWith(path.join('phases', '03-three')));
-  assert.equal(payload.goal, 'Goal of phase 3');
+  assert.equal(payload.milestone, 3);
+  assert.equal(payload.milestone_id, 'M003');
+  assert.ok(payload.milestone_dir.endsWith(path.join('milestones', 'M003')));
+  assert.ok(payload.milestone_research_path.endsWith(path.join('M003', 'M003-RESEARCH.md')));
+  assert.equal(payload.goal, 'Goal of milestone 3');
   assert.deepEqual(payload.requirements, ['R-1', 'R-2']);
   assert.equal(payload.has_research, false);
   assert.equal(typeof payload.tools_available, 'object');
   assert.equal(typeof payload.tools_available.WebFetch, 'boolean');
   assert.equal(typeof payload.tools_available.Context7, 'boolean');
   assert.ok('agent_skills' in payload);
+  assert.ok(Array.isArray(payload.slice_research));
 });
 
-test('RP-2: has_research=true iff {phase_dir}/{padded}-RESEARCH.md exists', () => {
+test('RP-2: has_research=true iff {milestone_dir}/{milestone_id}-RESEARCH.md exists', () => {
   const sandbox = makeSandbox();
   seedRoadmapYaml(sandbox, _baseRoadmap());
-  seedPhaseDir(sandbox, 3, 'three', { '03-RESEARCH.md': '# Research stub\n' });
+  const mDir = path.join(sandbox, '.nubos-pilot', 'milestones', 'M003');
+  fs.mkdirSync(mDir, { recursive: true });
+  fs.writeFileSync(path.join(mDir, 'M003-RESEARCH.md'), '# Research stub\n');
   const cap = _captureStdout();
   subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
   const payload = JSON.parse(cap.get().trim());
@@ -91,7 +85,6 @@ test('RP-2: has_research=true iff {phase_dir}/{padded}-RESEARCH.md exists', () =
 test('RP-3: tools_available defaults to {false,false} when env vars absent', () => {
   const sandbox = makeSandbox();
   seedRoadmapYaml(sandbox, _baseRoadmap());
-  seedPhaseDir(sandbox, 5, 'five-planning', {});
   _clearEnv();
   const cap = _captureStdout();
   subcmd.run(['5'], { cwd: sandbox, stdout: cap.stub });
@@ -103,7 +96,6 @@ test('RP-3: tools_available defaults to {false,false} when env vars absent', () 
 test('RP-4: NP_TOOLS_WEBFETCH=1 and NP_TOOLS_CONTEXT7=1 flip both booleans', () => {
   const sandbox = makeSandbox();
   seedRoadmapYaml(sandbox, _baseRoadmap());
-  seedPhaseDir(sandbox, 5, 'five-planning', {});
   process.env.NP_TOOLS_WEBFETCH = '1';
   process.env.NP_TOOLS_CONTEXT7 = '1';
   const cap = _captureStdout();
@@ -138,9 +130,8 @@ test('RP-7: oversized payload emits @file: pointer', () => {
 
   const big = _baseRoadmap();
   const huge = Array.from({ length: 2000 }, (_, i) => 'REQ-' + i + '-very-long-requirement-identifier-padded');
-  big.milestones[0].phases[0].requirements = huge;
+  big.milestones[0].requirements = huge;
   seedRoadmapYaml(sandbox, big);
-  seedPhaseDir(sandbox, 3, 'three', {});
   const cap = _captureStdout();
   subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
   const out = cap.get().trim();
@@ -148,7 +139,7 @@ test('RP-7: oversized payload emits @file: pointer', () => {
   const tmpPath = out.slice('@file:'.length);
   const body = fs.readFileSync(tmpPath, 'utf-8');
   const payload = JSON.parse(body);
-  assert.equal(payload.phase, 3);
+  assert.equal(payload.milestone, 3);
   assert.ok(payload.requirements.length >= 2000);
   fs.unlinkSync(tmpPath);
 });

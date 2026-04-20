@@ -1,6 +1,7 @@
 ---
 command: np:park
 description: Mark a task as parked (lifecycle CRUD). Use when a task needs to be deferred without being marked skipped.
+argument-hint: <task-id>
 ---
 
 # /np:park

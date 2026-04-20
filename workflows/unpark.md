@@ -1,6 +1,7 @@
 ---
 command: np:unpark
 description: Return a parked task to pending status (lifecycle CRUD). Counterpart to /np:park.
+argument-hint: <task-id>
 ---
 
 # /np:unpark

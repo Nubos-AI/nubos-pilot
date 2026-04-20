@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { projectStateDir, NubosPilotError } = require('../../lib/core.cjs');
-const { phaseSlug } = require('../../lib/phase.cjs');
+const { slugify } = require('../../lib/layout.cjs');
 
 const MAX_DESCRIPTION_LENGTH = 500;
 
@@ -34,7 +34,7 @@ function _buildPayload(description, cwd) {
   const now = new Date();
   const iso = now.toISOString();
   const date = iso.slice(0, 10);
-  const slug = phaseSlug(description);
+  const slug = slugify(description);
   if (!slug) {
     throw new NubosPilotError(
       'add-todo-empty-slug',

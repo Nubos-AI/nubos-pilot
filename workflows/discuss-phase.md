@@ -1,13 +1,12 @@
 ---
 command: np:discuss-phase
-description: Adaptive interview to capture phase implementation decisions; writes CONTEXT.md.
+description: Adaptive interview to capture milestone implementation decisions; writes M<NNN>-CONTEXT.md.
+argument-hint: <milestone-number> [--assumptions|--power]
 ---
 
 # np:discuss-phase
 
-Extract implementation decisions that downstream agents (researcher, planner)
-need. Minimum Phase-5 scope: adaptive askUser()-based interview covering the
-nine context areas and a single CONTEXT.md render.
+Extract implementation decisions for a milestone (user-facing: "phase") that downstream agents (researcher, planner) need. Writes `.nubos-pilot/milestones/M<NNN>/M<NNN>-CONTEXT.md`.
 
 The `--assumptions` flag routes to `workflows/discuss-phase-assumptions.md`
 (lighter-weight codebase-first mode). The `--power` flag is owned by Plan
@@ -24,8 +23,9 @@ INIT=$(node np-tools.cjs init discuss-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 ```
 
-Parse JSON for: `phase_number`, `padded`, `phase_dir`, `phase_name`,
-`phase_slug`, `has_context`, `goal`, `requirements`, `agent_skills`, `mode`.
+Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`,
+`milestone_context_path`, `has_context`, `has_milestone_dir`, `goal`,
+`requirements`, `agent_skills`, `mode`.
 
 If the user passed `--assumptions`, route to
 `workflows/discuss-phase-assumptions.md` and exit this workflow.
@@ -141,14 +141,14 @@ Text mode applies to ALL workflows in the session, not just discuss-phase.
 
 ## Process
 
-### Step 1: Guard against existing CONTEXT.md
+### Step 1: Guard against existing M<NNN>-CONTEXT.md
 
 If `has_context` is `true`, ask the user how to proceed:
 
 ```bash
 node np-tools.cjs askuser --json '{
   "type": "select",
-  "prompt": "Phase '"$PHASE"' already has a CONTEXT.md. What do you want to do?",
+  "prompt": "Milestone '"$MILESTONE_ID"' already has a CONTEXT.md. What do you want to do?",
   "options": [
     "Overwrite existing CONTEXT.md",
     "Append update section",
@@ -157,16 +157,25 @@ node np-tools.cjs askuser --json '{
 }'
 ```
 
-- **Overwrite** → preserve the prior file as `{padded}-CONTEXT.archive.md`
+- **Overwrite** → preserve the prior file as `<milestone_id>-CONTEXT.archive.md`
   before writing the new one:
   ```bash
-  mv "$PHASE_DIR/$PADDED-CONTEXT.md" "$PHASE_DIR/$PADDED-CONTEXT.archive.md"
+  mv "$MILESTONE_DIR/$MILESTONE_ID-CONTEXT.md" "$MILESTONE_DIR/$MILESTONE_ID-CONTEXT.archive.md"
   ```
 - **Append update section** → skip the archive move; the write step below
   appends a fresh `## Update — <date>` section instead of replacing content.
 - **Abort** → exit the workflow. No file changes.
 
-If `has_context` is `false`, continue directly to Step 2.
+If `has_context` is `false`, ensure the milestone dir exists before writing later:
+
+```bash
+if [ "$HAS_MILESTONE_DIR" = "false" ]; then
+  mkdir -p "$MILESTONE_DIR"
+  mkdir -p "$MILESTONE_DIR/slices"
+fi
+```
+
+Continue directly to Step 2.
 
 ### Step 2: Confirm phase goal
 
@@ -302,44 +311,45 @@ node np-tools.cjs askuser --json '{
 }'
 ```
 
-### Step 6: Render CONTEXT.md
+### Step 6: Render M<NNN>-CONTEXT.md
 
-Render `templates/CONTEXT.md` with `lib/template.cjs`. The render call is
+Render `templates/milestone/CONTEXT.md` with `lib/template.cjs`. The render call is
 fail-loud on unknown placeholders, so the variables object below must match
 the template's `{{var}}` keys exactly.
 
 ```bash
-PHASE_DIR=$(echo "$INIT" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{console.log(JSON.parse(d).phase_dir)})')
-PADDED=$(echo "$INIT" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{console.log(JSON.parse(d).padded)})')
-mkdir -p "$PHASE_DIR"
+MILESTONE_DIR=$(echo "$INIT" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{console.log(JSON.parse(d).milestone_dir)})')
+MILESTONE_ID=$(echo "$INIT" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{console.log(JSON.parse(d).milestone_id)})')
+CONTEXT_PATH=$(echo "$INIT" | node -e 'let d="";process.stdin.on("data",c=>d+=c).on("end",()=>{console.log(JSON.parse(d).milestone_context_path)})')
+mkdir -p "$MILESTONE_DIR"
+mkdir -p "$MILESTONE_DIR/slices"
 
 node -e '
   const { render } = require("./lib/template.cjs");
   const fs = require("node:fs");
-  const tpl = fs.readFileSync("templates/CONTEXT.md", "utf-8");
+  const tpl = fs.readFileSync("templates/milestone/CONTEXT.md", "utf-8");
   const vars = JSON.parse(process.argv[1]);
   process.stdout.write(render(tpl, vars));
-' "$VARS_JSON" > "$PHASE_DIR/$PADDED-CONTEXT.md"
+' "$VARS_JSON" > "$CONTEXT_PATH"
 ```
 
-`$VARS_JSON` is the JSON-serialised accumulator from Steps 2–5:
+`$VARS_JSON` is the JSON-serialised accumulator from Steps 2–5 (keys map to
+`templates/milestone/CONTEXT.md` placeholders):
 
 ```jsonc
 {
-  "phase_number": "5",
-  "phase_name": "...",
-  "goal": "...",
-  "domain": "...",
-  "decisions": "...",   // collected from Step 4
-  "canonical_refs": "...",
-  "code_context": "...",
-  "specifics": "...",
-  "deferred": "...",
-  "date": "2026-04-15"
+  "milestone_id": "M001",
+  "milestone_name": "Auth & Basic UI",
+  "created_date": "2026-04-15",
+  "goal_text": "...",
+  "domain_text": "...",
+  "decisions_text": "...",     // collected from Step 4
+  "canonical_refs_text": "...",
+  "deferred_text": "..."
 }
 ```
 
-If `templates/CONTEXT.md` lacks a key, `render()` throws
+If the template lacks a key, `render()` throws
 `NubosPilotError('template-missing-key', …)` — the workflow must not swallow
 that error. Fix the template or the accumulator, don't mask the failure.
 
@@ -348,8 +358,8 @@ that error. Fix the template or the accumulator, don't mask the failure.
 ```bash
 COMMIT_DOCS=$(node np-tools.cjs config-get workflow.commit_docs 2>/dev/null || echo "true")
 if [[ "$COMMIT_DOCS" == "true" ]]; then
-  git add "$PHASE_DIR/$PADDED-CONTEXT.md"
-  git commit -m "docs($PADDED): capture phase context"
+  git add "$CONTEXT_PATH"
+  git commit -m "docs($MILESTONE_ID): capture milestone context"
 fi
 ```
 
@@ -361,7 +371,7 @@ opting into manual commit gating.
 ```bash
 node np-tools.cjs askuser --json '{
   "type": "confirm",
-  "prompt": "CONTEXT.md written at '"$PHASE_DIR"'/'"$PADDED"'-CONTEXT.md. Run np:plan-phase '"$PHASE"' now?",
+  "prompt": "CONTEXT.md written at '"$CONTEXT_PATH"'. Run np:plan-phase '"$PHASE"' now?",
   "default": true
 }'
 ```
@@ -375,7 +385,7 @@ Next: /np:plan-phase $PHASE
 
 ## Success Criteria
 
-- `{phase_dir}/{padded}-CONTEXT.md` exists with all six required sections
+- `{milestone_dir}/{milestone_id}-CONTEXT.md` exists with all six required sections
   (domain, decisions, canonical_refs, code_context, specifics, deferred).
 - Every interactive prompt went through `np-tools.cjs askuser`; zero bare
   `np-tools.cjs askuser` bypasses.

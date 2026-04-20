@@ -1,6 +1,7 @@
 ---
 command: np:add-tests
 description: Persist Pass-SCs from VERIFICATION.md as node:test UAT blocks in test/uat/phase-<padded>-<slug>.test.cjs. Sentinel-preserving (D-20, Pitfall 8).
+argument-hint: <phase-number>
 ---
 
 # /np:add-tests

@@ -58,11 +58,11 @@ fi
 
 ### status: clean
 
-No active work. Print the next-step hint:
+No active work. Point the user at the next milestone:
 
 ```bash
 if [ "$STATUS" = "clean" ]; then
-  node np-tools.cjs next
+  echo "Session clean. Next: /np:plan-phase <N> or /np:execute-phase <N>." >&2
 fi
 ```
 

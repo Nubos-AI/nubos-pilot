@@ -36,14 +36,14 @@ afterEach(() => {
   }
 });
 
-test('E2E-NP-1: --apply happy path creates all 5 files + first phase dir', () => {
+test('E2E-NP-1: --apply happy path creates PROJECT + REQUIREMENTS + roadmap.yaml + STATE + nubos-pilot milestone dir', () => {
   const sandbox = makeEmpty();
   const answersPath = _writeAnswers(sandbox, 'answers', {
     project_name: 'E2E Demo',
     core_value: 'Ship end-to-end proof.',
     primary_constraints: 'No deps; markdown-first',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'Kickoff Phase',
+    first_milestone_name: 'Kickoff Milestone',
+    first_milestone_goal: 'Ship the kickoff prototype',
   });
 
   newProject.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
@@ -52,21 +52,18 @@ test('E2E-NP-1: --apply happy path creates all 5 files + first phase dir', () =>
     '.nubos-pilot/PROJECT.md',
     '.nubos-pilot/REQUIREMENTS.md',
     '.nubos-pilot/roadmap.yaml',
-    '.nubos-pilot/ROADMAP.md',
     '.nubos-pilot/STATE.md',
   ];
   for (const rel of expected) {
     assert.ok(fs.existsSync(path.join(sandbox, rel)), 'missing: ' + rel);
   }
 
-  const phasesRoot = path.join(sandbox, '.nubos-pilot', 'phases');
-  const entries = fs.readdirSync(phasesRoot);
-  const phaseDir = entries.find((e) => e.startsWith('01-'));
-  assert.ok(phaseDir, 'no 01-<slug>/ phase dir scaffolded');
-  assert.ok(
-    fs.existsSync(path.join(phasesRoot, phaseDir, '01-CONTEXT.md')),
-    '01-CONTEXT.md missing',
-  );
+  const mDir = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001');
+  assert.ok(fs.existsSync(mDir), 'milestones/M001 missing');
+  assert.ok(fs.existsSync(path.join(mDir, 'M001-CONTEXT.md')));
+  assert.ok(fs.existsSync(path.join(mDir, 'M001-ROADMAP.md')));
+  assert.ok(fs.existsSync(path.join(mDir, 'M001-META.json')));
+  assert.ok(fs.existsSync(path.join(mDir, 'slices')));
 });
 
 test('E2E-NP-2: PROJECT.md contains supplied project_name and core_value', () => {
@@ -75,8 +72,8 @@ test('E2E-NP-2: PROJECT.md contains supplied project_name and core_value', () =>
     project_name: 'My Specific Product',
     core_value: 'One sentence of truth about why this ships.',
     primary_constraints: 'c',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'First Phase',
+    first_milestone_name: 'First Milestone',
+    first_milestone_goal: 'g',
   });
   newProject.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
   const raw = fs.readFileSync(path.join(sandbox, '.nubos-pilot', 'PROJECT.md'), 'utf-8');
@@ -85,24 +82,23 @@ test('E2E-NP-2: PROJECT.md contains supplied project_name and core_value', () =>
   assert.doesNotMatch(raw, /\{\{[a-z_]+\}\}/, 'unrendered placeholders remain');
 });
 
-test('E2E-NP-3: ROADMAP.md contains the first phase row', () => {
+test('E2E-NP-3: roadmap.yaml records the first milestone with slices: []', () => {
   const sandbox = makeEmpty();
   const answersPath = _writeAnswers(sandbox, 'answers', {
     project_name: 'Demo',
     core_value: 'v',
     primary_constraints: 'c',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'Kickoff Phase',
+    first_milestone_name: 'Kickoff Milestone',
+    first_milestone_goal: 'Ship kickoff',
   });
   newProject.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
-  const raw = fs.readFileSync(path.join(sandbox, '.nubos-pilot', 'ROADMAP.md'), 'utf-8');
-
-  
-
-  assert.ok(raw.includes('kickoff-phase') || raw.includes('Kickoff Phase'),
-    'ROADMAP.md missing first phase');
-  assert.ok(raw.includes('01') || raw.includes('Phase 1') || raw.includes('phase 1'),
-    'ROADMAP.md missing phase number');
+  const doc = YAML.parse(fs.readFileSync(path.join(sandbox, '.nubos-pilot', 'roadmap.yaml'), 'utf-8'));
+  assert.equal(doc.schema_version, 2);
+  assert.equal(doc.milestones.length, 1);
+  assert.equal(doc.milestones[0].id, 'M001');
+  assert.equal(doc.milestones[0].name, 'Kickoff Milestone');
+  assert.ok(Array.isArray(doc.milestones[0].slices));
+  assert.equal(doc.milestones[0].slices.length, 0);
 });
 
 test('E2E-NP-4: second invocation throws project-already-initialized', () => {
@@ -111,8 +107,8 @@ test('E2E-NP-4: second invocation throws project-already-initialized', () => {
     project_name: 'X',
     core_value: 'v',
     primary_constraints: 'c',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'First Phase',
+    first_milestone_name: 'First',
+    first_milestone_goal: 'g',
   });
   newProject.run(['--apply', a1], { cwd: sandbox, stdout: _captureStdout().stub });
 
@@ -120,8 +116,8 @@ test('E2E-NP-4: second invocation throws project-already-initialized', () => {
     project_name: 'Different',
     core_value: 'w',
     primary_constraints: 'd',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'Phase Two',
+    first_milestone_name: 'Second',
+    first_milestone_goal: 'g2',
   });
   let caught = null;
   try {
@@ -134,15 +130,15 @@ test('E2E-NP-4: second invocation throws project-already-initialized', () => {
   assert.equal(caught.code, 'project-already-initialized');
 });
 
-test('E2E-NP-5: new-milestone after new-project appends milestone + phase; PROJECT.md byte-equal', () => {
+test('E2E-NP-5: new-milestone after new-project appends nubos-pilot milestone dir; PROJECT.md byte-equal', () => {
   const sandbox = makeEmpty();
 
   const initAnswers = _writeAnswers(sandbox, 'init', {
     project_name: 'Demo',
     core_value: 'v',
     primary_constraints: 'c',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'First Phase',
+    first_milestone_name: 'First Milestone',
+    first_milestone_goal: 'g',
   });
   newProject.run(['--apply', initAnswers], { cwd: sandbox, stdout: _captureStdout().stub });
 
@@ -150,34 +146,37 @@ test('E2E-NP-5: new-milestone after new-project appends milestone + phase; PROJE
   const beforeHash = crypto.createHash('sha256').update(fs.readFileSync(projectMdPath)).digest('hex');
 
   const msAnswers = _writeAnswers(sandbox, 'ms', {
-    milestone_name: 'v2.0',
+    milestone_name: 'Second Milestone',
     milestone_goal: 'second milestone goal',
-    first_phase_name: 'Second Phase',
     create_req_prefix: false,
   });
   newMilestone.run(['--apply', msAnswers], { cwd: sandbox, stdout: _captureStdout().stub });
 
   const doc = YAML.parse(fs.readFileSync(path.join(sandbox, '.nubos-pilot', 'roadmap.yaml'), 'utf-8'));
-  assert.equal(doc.milestones.length, 2);
-  assert.equal(doc.milestones[1].id, 'v2-0');
-  assert.equal(doc.milestones[1].phases.length, 1);
+  const added = doc.milestones.find((m) => m && m.name === 'Second Milestone');
+  assert.ok(added, 'Second Milestone not found in roadmap');
+  assert.ok(Array.isArray(added.slices));
+  const mDir = path.join(sandbox, '.nubos-pilot', 'milestones', added.id);
+  assert.ok(fs.existsSync(path.join(mDir, added.id + '-CONTEXT.md')));
+  assert.ok(fs.existsSync(path.join(mDir, added.id + '-ROADMAP.md')));
+  assert.ok(fs.existsSync(path.join(mDir, added.id + '-META.json')));
 
   const afterHash = crypto.createHash('sha256').update(fs.readFileSync(projectMdPath)).digest('hex');
   assert.equal(afterHash, beforeHash, 'PROJECT.md was mutated by new-milestone — D-29 violation');
 });
 
-test('E2E-NP-6: STATE.md reflects current_phase=1 after new-project', () => {
+test('E2E-NP-6: STATE.md reflects milestone=M001 and milestone_number=1 after new-project', () => {
   const sandbox = makeEmpty();
   const answersPath = _writeAnswers(sandbox, 'answers', {
     project_name: 'Demo',
     core_value: 'v',
     primary_constraints: 'c',
-    first_milestone_name: 'v1.0',
-    first_phase_name: 'First Phase',
+    first_milestone_name: 'First Milestone',
+    first_milestone_goal: 'g',
   });
   newProject.run(['--apply', answersPath], { cwd: sandbox, stdout: _captureStdout().stub });
   const { readState } = require('../lib/state.cjs');
   const st = readState(sandbox);
-  assert.equal(st.frontmatter.current_phase, 1);
-  assert.equal(st.frontmatter.milestone, 'v1-0');
+  assert.equal(st.frontmatter.milestone, 'M001');
+  assert.equal(st.frontmatter.milestone_number, 1);
 });

@@ -1,6 +1,7 @@
 ---
 command: np:note
 description: Capture a free-form note to markdown. Defaults to project scope (.nubos-pilot/notes/YYYY-MM-DD-<slug>.md, committed). Use --global for sensitive/cross-project notes (~/.nubos-pilot/notes/YYYY-MM-DD-<slug>.md, NOT committed). No agent spawn, no STATE mutation.
+argument-hint: [--global] <text>
 ---
 
 # np:note
@@ -76,9 +77,9 @@ NOTE_PATH="${NOTES_DIR}/${DATE}-${SLUG}.md"
 ```
 
 Slug generation is delegated to `node np-tools.cjs generate-slug`
-(which wraps `lib/phase.cjs.phaseSlug`) — the same filename-safety
-rails used by every capture workflow (T-10-05-01 & T-10-05-02
-mitigation; only `[a-z0-9-]` enter the filename).
+(which wraps `lib/layout.cjs.slugify`) — the same filename-safety
+rails used by every capture workflow (only `[a-z0-9-]` enter the
+filename).
 
 ## Duplicate Check
 

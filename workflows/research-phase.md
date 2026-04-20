@@ -1,13 +1,12 @@
 ---
 command: np:research-phase
-description: Phase-level technical research — spawn the researcher subagent, produce RESEARCH.md, fall back to local-only sources when WebFetch + Context7 are both unavailable.
+description: Milestone-level technical research — spawn the researcher subagent, produce M<NNN>-RESEARCH.md, fall back to local-only sources when WebFetch + Context7 are both unavailable.
+argument-hint: <milestone-number>
 ---
 
 # np:research-phase
 
-Phase-level technical research. Spawns the `researcher` subagent
-(`agents/np-researcher.md`, tier=sonnet per Phase-5 D-13) with phase context and
-produces `{phase_dir}/{padded}-RESEARCH.md`.
+Milestone-level technical research. Spawns the `researcher` subagent (`agents/np-researcher.md`, tier=sonnet) with milestone context and produces `{milestone_dir}/{milestone_id}-RESEARCH.md`.
 
 Standalone research command. For most workflows, use `/np:plan-phase` which
 integrates research automatically. This command is the audit-friendly entry
@@ -31,7 +30,7 @@ without WebFetch / Context7).
 ## Scope Guardrail
 
 <scope_guardrail>
-This workflow ONLY writes `{phase_dir}/{padded}-RESEARCH.md`. It NEVER:
+This workflow ONLY writes `{milestone_dir}/{milestone_id}-RESEARCH.md`. It NEVER:
 
 - edits `roadmap.yaml` or `.nubos-pilot/ROADMAP.md`
 - touches STATE.md
@@ -46,7 +45,7 @@ automatically. Resumption is a Phase 6 executor concern.
 ## Downstream Awareness
 
 <downstream_awareness>
-`{phase_dir}/{padded}-RESEARCH.md` is consumed by the planner
+`{milestone_dir}/{milestone_id}-RESEARCH.md` is consumed by the planner
 (`agents/np-planner.md`) and then by plan-checker. The planner turns
 "Standard Stack" entries into literal task actions ("Install `jose@6.0.10`")
 and "Common Pitfalls" into verification steps. If the offline path was
@@ -60,7 +59,7 @@ why Step 4 below validates the section presence after spawn.
 <answer_validation>
 Before exiting, confirm:
 
-1. `{phase_dir}/{padded}-RESEARCH.md` exists and is non-empty.
+1. `{milestone_dir}/{milestone_id}-RESEARCH.md` exists and is non-empty.
 2. If `MODE == offline`, the file contains a literal `## Research Coverage`
    heading (D-22).
 3. If the user declined the offline-confirm prompt, RESEARCH.md was NOT
@@ -107,8 +106,10 @@ The payload shape:
 {
   "_workflow": "research-phase",
   "phase": 5,
-  "padded": "05",
-  "phase_dir": "/abs/.nubos-pilot/phases/05-planning",
+  "milestone": 5,
+  "milestone_id": "M005",
+  "milestone_dir": "/abs/.nubos-pilot/milestones/M005",
+  "milestone_research_path": "/abs/.nubos-pilot/milestones/M005/M005-RESEARCH.md",
   "goal": "…",
   "requirements": ["PLAN-03", "…"],
   "has_research": false,
@@ -123,15 +124,15 @@ The payload shape:
 Extract fields:
 
 ```bash
-PADDED=$(echo "$INIT" | jq -r '.padded')
-PHASE_DIR=$(echo "$INIT" | jq -r '.phase_dir')
+MILESTONE_ID=$(echo "$INIT" | jq -r '.milestone_id')
+MILESTONE_DIR=$(echo "$INIT" | jq -r '.milestone_dir')
 HAS_RESEARCH=$(echo "$INIT" | jq -r '.has_research')
 WEBFETCH_AVAILABLE=$(echo "$INIT" | jq -r '.tools_available.WebFetch')
 CONTEXT7_AVAILABLE=$(echo "$INIT" | jq -r '.tools_available.Context7')
-CONTEXT_PATH="$PHASE_DIR/$PADDED-CONTEXT.md"
-RESEARCH_PATH="$PHASE_DIR/$PADDED-RESEARCH.md"
-PLAN_ID="${PADDED}-research"
-TASK_ID="${PADDED}-researcher"
+CONTEXT_PATH="$MILESTONE_DIR/$MILESTONE_ID-CONTEXT.md"
+RESEARCH_PATH=$(echo "$INIT" | jq -r '.milestone_research_path')
+PLAN_ID="${MILESTONE_ID}-research"
+TASK_ID="${MILESTONE_ID}-researcher"
 ```
 
 `PLAN_ID` / `TASK_ID` default to stable tokens for the metrics record at the
@@ -284,7 +285,7 @@ COMMIT_DOCS=$(node -e 'try{
 if [[ "$COMMIT_DOCS" == "true" ]]; then
   git add "$RESEARCH_PATH"
   if ! git diff --cached --quiet; then
-    git commit --no-verify -m "docs($PADDED): research phase $PHASE ($MODE mode)"
+    git commit --no-verify -m "docs($MILESTONE_ID): research milestone $PHASE ($MODE mode)"
   fi
 else
   echo "commit_docs=false — RESEARCH.md remains staged-dirty" >&2
@@ -300,7 +301,7 @@ Canonical tokens this workflow uses:
 | Tools-binary CJS entry        | `np-tools.cjs`               |
 | Slash-command for research    | `/np:research-phase`         |
 | Researcher subagent name      | `researcher`                 |
-| Phase directory root          | `.nubos-pilot/phases/…`      |
+| Milestone directory root      | `.nubos-pilot/milestones/…`  |
 | Claude-Code `Task(…)` spawn   | abstract `Spawn agent=…`     |
 
 Auto-advance state lives on `workflow.auto_advance` (boolean). Set

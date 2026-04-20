@@ -1,4 +1,4 @@
-const { phaseSlug } = require('../../lib/phase.cjs');
+const { slugify } = require('../../lib/layout.cjs');
 
 const MAX_SLUG_LENGTH = 128;
 
@@ -21,7 +21,7 @@ function run(argv, ctx) {
     stderr.write(_usage() + '\n');
     return 1;
   }
-  const slug = phaseSlug(String(text)).slice(0, MAX_SLUG_LENGTH);
+  const slug = slugify(String(text)).slice(0, MAX_SLUG_LENGTH);
   if (raw) stdout.write(slug);
   else stdout.write(slug + '\n');
   return 0;

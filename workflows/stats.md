@@ -1,6 +1,7 @@
 ---
 command: np:stats
 description: Stats output — phases-table (name/plans/completed/status/%) + metrics aggregation (tokens-in/out per phase, avg duration by tier, retry_count_sum, error_rate). Consumes node np-tools.cjs stats json. Null-token runtimes render as `—` (Phase 9 D-09). Read-only — no commits, no STATE mutation.
+argument-hint: [json]
 ---
 
 # np:stats

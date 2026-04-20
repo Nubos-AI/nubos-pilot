@@ -1,6 +1,7 @@
 ---
 command: np:add-todo
 description: Capture a pending todo to .nubos-pilot/todos/pending/YYYY-MM-DD-<slug>.md; increments STATE.md pending_todos count via lib/state.cjs.mutateState single-writer lock. One atomic docs commit. No agent spawn.
+argument-hint: <description>
 ---
 
 # np:add-todo
@@ -41,10 +42,10 @@ TODO_PATH="${PENDING_DIR}/${DATE}-${SLUG}.md"
 
 Extract from init JSON: `commit_docs`, `date`, `timestamp`, `slug`,
 `todo_count`, `todos_dir_exists`, `pending_dir`, `state_path`. The
-init handler sanitises the slug through `lib/phase.cjs.phaseSlug`
-(strips to `[a-z0-9-]` only; T-10-05-01 filename-injection
-mitigation) and validates the description length (<= 500 chars) before
-any filesystem write occurs.
+init handler sanitises the slug through `lib/layout.cjs.slugify`
+(strips to `[a-z0-9-]` only; filename-injection mitigation) and
+validates the description length (<= 500 chars) before any filesystem
+write occurs.
 
 ## Create Pending Dir
 
@@ -199,7 +200,7 @@ Use /np:next to surface this todo in the next-step picker.
 
 - [ ] Description validated (non-empty, <= 500 chars) via the init
       handler before any filesystem write.
-- [ ] Slug derived via `phaseSlug` so only `[a-z0-9-]` enter the
+- [ ] Slug derived via `slugify` so only `[a-z0-9-]` enter the
       filename (T-10-05-01 mitigation).
 - [ ] Pending todo directory created idempotently.
 - [ ] Duplicate collisions resolved via `askuser` Pattern S-3

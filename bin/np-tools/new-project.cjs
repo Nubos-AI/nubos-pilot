@@ -1,3 +1,5 @@
+'use strict';
+
 const fs = require('node:fs');
 const path = require('node:path');
 const YAML = require('yaml');
@@ -6,9 +8,8 @@ const {
   NubosPilotError,
   atomicWriteFileSync,
 } = require('../../lib/core.cjs');
-const { addMilestone, addPhase } = require('../../lib/roadmap.cjs');
-const { createPhaseDir, phaseSlug } = require('../../lib/phase.cjs');
 const { writeState } = require('../../lib/state.cjs');
+const layout = require('../../lib/layout.cjs');
 
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', 'templates');
 const PLACEHOLDER_RE = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
@@ -52,21 +53,16 @@ function _interviewPayload() {
       { key: 'primary_constraints', type: 'input',
         question: 'Primary constraints (comma-separated, e.g. "Node 22; markdown-first")?' },
       { key: 'first_milestone_name', type: 'input',
-        question: 'First milestone name (e.g. "v1.0")?' },
-      { key: 'first_phase_name', type: 'input',
-        question: 'First phase name (will be slugified for the directory)?' },
+        question: 'First milestone name (e.g. "Auth & Basic UI")?' },
+      { key: 'first_milestone_goal', type: 'input',
+        question: 'First milestone goal — one sentence describing what ships?' },
     ],
   };
 }
 
 function _validateAnswers(a) {
-  for (const key of [
-    'project_name',
-    'core_value',
-    'primary_constraints',
-    'first_milestone_name',
-    'first_phase_name',
-  ]) {
+  const required = ['project_name', 'core_value', 'primary_constraints', 'first_milestone_name'];
+  for (const key of required) {
     if (typeof a[key] !== 'string' || a[key].trim() === '') {
       throw new NubosPilotError(
         'answers-missing-field',
@@ -74,6 +70,14 @@ function _validateAnswers(a) {
         { field: key },
       );
     }
+  }
+  if ((typeof a.first_milestone_goal !== 'string' || a.first_milestone_goal.trim() === '') &&
+      (typeof a.first_phase_name !== 'string' || a.first_phase_name.trim() === '')) {
+    throw new NubosPilotError(
+      'answers-missing-field',
+      'answers JSON missing field: first_milestone_goal',
+      { field: 'first_milestone_goal' },
+    );
   }
 }
 
@@ -116,42 +120,38 @@ function _apply(answersPath, cwd, stdout) {
     );
   }
 
-  const milestoneId = _slugify(answers.first_milestone_name);
-  if (milestoneId === '') {
-    throw new NubosPilotError(
-      'invalid-slug',
-      'first_milestone_name slugifies to empty string',
-      { value: answers.first_milestone_name, field: 'first_milestone_name' },
-    );
-  }
-  const phaseSlugValue = phaseSlug(answers.first_phase_name);
-  if (phaseSlugValue === '') {
-    throw new NubosPilotError(
-      'invalid-slug',
-      'first_phase_name slugifies to empty string',
-      { value: answers.first_phase_name, field: 'first_phase_name' },
-    );
-  }
-
+  const firstMilestoneName = answers.first_milestone_name;
+  const firstMilestoneGoal = answers.first_milestone_goal || answers.first_phase_name || '';
   const createdDate = _todayIso();
-
-  
-
-  
+  const firstMilestoneNumber = 1;
+  const firstMilestoneId = layout.mId(firstMilestoneNumber);
 
   fs.mkdirSync(stateDir, { recursive: true });
-  const roadmapYamlPath = path.join(stateDir, 'roadmap.yaml');
-  const emptyRoadmap = { schema_version: 1, milestones: [] };
-  atomicWriteFileSync(roadmapYamlPath, YAML.stringify(emptyRoadmap, { indent: 2 }));
 
-  
+  const roadmapYamlPath = path.join(stateDir, 'roadmap.yaml');
+  const initialRoadmap = {
+    schema_version: 2,
+    milestones: [
+      {
+        id: firstMilestoneId,
+        number: firstMilestoneNumber,
+        name: firstMilestoneName,
+        goal: firstMilestoneGoal,
+        status: 'pending',
+        requirements: [],
+        success_criteria: [],
+        slices: [],
+      },
+    ],
+  };
+  atomicWriteFileSync(roadmapYamlPath, YAML.stringify(initialRoadmap, { indent: 2 }));
 
   const projectVars = {
     project_name: answers.project_name,
     core_value: answers.core_value,
     primary_constraints: answers.primary_constraints,
-    first_milestone_name: answers.first_milestone_name,
-    first_phase_name: answers.first_phase_name,
+    first_milestone_name: firstMilestoneName,
+    first_phase_name: firstMilestoneName,
     created_date: createdDate,
     project_description: '_TBD — filled by `/np:discuss-project`._',
     domain_text: '_TBD — filled by `/np:discuss-project`._',
@@ -162,12 +162,10 @@ function _apply(answersPath, cwd, stdout) {
   };
   atomicWriteFileSync(projectMd, _render(_loadTemplate('PROJECT'), projectVars, 'PROJECT'));
 
-  
-
   const reqVars = {
     project_name: answers.project_name,
     core_value: answers.core_value,
-    first_milestone_name: answers.first_milestone_name,
+    first_milestone_name: firstMilestoneName,
     created_date: createdDate,
   };
   atomicWriteFileSync(
@@ -175,64 +173,68 @@ function _apply(answersPath, cwd, stdout) {
     _render(_loadTemplate('REQUIREMENTS'), reqVars, 'REQUIREMENTS'),
   );
 
-  
-
-  
-  addMilestone({ id: milestoneId, name: answers.first_milestone_name, phases: [] }, root);
-  const phaseResult = addPhase(
-    milestoneId,
+  layout.createMilestoneDir(firstMilestoneNumber, root);
+  const msTemplatesDir = path.join(TEMPLATES_DIR, 'milestone');
+  const msCtx = _render(
+    fs.readFileSync(path.join(msTemplatesDir, 'CONTEXT.md'), 'utf-8'),
     {
-      slug: phaseSlugValue,
-      name: answers.first_phase_name,
-      goal: '',
-      depends_on: [],
-      requirements: [],
-      success_criteria: [],
-      status: 'pending',
-      plans: [],
+      milestone_id: firstMilestoneId,
+      milestone_name: firstMilestoneName,
+      created_date: createdDate,
+      goal_text: firstMilestoneGoal,
+      decisions_text: '<!-- TBD: locked decisions from /np:discuss-phase -->',
+      deferred_text: '<!-- TBD: deferred ideas -->',
+      domain_text: '<!-- TBD: domain boundary -->',
+      canonical_refs_text: '<!-- TBD: canonical references -->',
     },
-    root,
+    'milestone/CONTEXT.md',
   );
-
-  
-
-  const phaseDir = createPhaseDir(phaseResult.number, phaseSlugValue, root);
-  const ctxVars = {
-    phase_number: String(phaseResult.number),
-    phase_name: answers.first_phase_name,
-    phase_padded: String(phaseResult.number).padStart(2, '0'),
-    phase_slug: phaseSlugValue,
-    created_date: createdDate,
-    domain_text: '<!-- TBD: phase boundary -->',
-    decisions_text: '<!-- TBD: decisions -->',
-    canonical_refs_text: '<!-- TBD: canonical references -->',
-    code_context_text: '<!-- TBD: existing code insights -->',
-    specifics_text: '<!-- TBD: specific ideas / references -->',
-    deferred_text: '<!-- TBD: deferred ideas -->',
-  };
-  const contextMdPath = path.join(
-    phaseDir,
-    String(phaseResult.number).padStart(2, '0') + '-CONTEXT.md',
+  const msRoadmap = _render(
+    fs.readFileSync(path.join(msTemplatesDir, 'ROADMAP.md'), 'utf-8'),
+    {
+      milestone_id: firstMilestoneId,
+      milestone_name: firstMilestoneName,
+      created_date: createdDate,
+      slices_text: '<!-- TBD: slices will be appended by /np:plan-phase ' + firstMilestoneNumber + ' -->',
+    },
+    'milestone/ROADMAP.md',
   );
-  atomicWriteFileSync(contextMdPath, _render(_loadTemplate('CONTEXT'), ctxVars, 'CONTEXT'));
-
-  
+  const msMeta = _render(
+    fs.readFileSync(path.join(msTemplatesDir, 'META.json'), 'utf-8'),
+    {
+      milestone_id: firstMilestoneId,
+      milestone_name: JSON.stringify(firstMilestoneName).slice(1, -1),
+      status: 'pending',
+      created_date: createdDate,
+      goal_text_escaped: JSON.stringify(firstMilestoneGoal).slice(1, -1),
+      requirements_json: '[]',
+      success_criteria_json: '[]',
+      slice_count: 0,
+      task_count: 0,
+    },
+    'milestone/META.json',
+  );
+  atomicWriteFileSync(layout.milestoneContextPath(firstMilestoneNumber, root), msCtx);
+  atomicWriteFileSync(layout.milestoneRoadmapPath(firstMilestoneNumber, root), msRoadmap);
+  atomicWriteFileSync(layout.milestoneMetaPath(firstMilestoneNumber, root), msMeta);
 
   writeState(
     {
       frontmatter: {
         schema_version: 2,
-        milestone: milestoneId,
-        milestone_name: answers.first_milestone_name,
-        current_phase: Number(phaseResult.number),
-        current_plan: null,
+        milestone: firstMilestoneId,
+        milestone_number: firstMilestoneNumber,
+        milestone_name: firstMilestoneName,
+        current_slice: null,
         current_task: null,
         last_updated: new Date().toISOString(),
         progress: {
-          total_phases: 1,
-          completed_phases: 0,
-          total_plans: 0,
-          completed_plans: 0,
+          total_milestones: 1,
+          completed_milestones: 0,
+          total_slices: 0,
+          completed_slices: 0,
+          total_tasks: 0,
+          completed_tasks: 0,
           percent: 0,
         },
         session: {
@@ -246,20 +248,20 @@ function _apply(answersPath, cwd, stdout) {
     root,
   );
 
-  
-
   _emit(stdout, {
     mode: 'apply',
-    milestoneId,
-    firstPhaseNumber: phaseResult.number,
-    firstPhaseSlug: phaseSlugValue,
+    milestone_id: firstMilestoneId,
+    milestone_number: firstMilestoneNumber,
+    milestone_name: firstMilestoneName,
+    milestone_dir: layout.milestoneDir(firstMilestoneNumber, root),
     created: [
       '.nubos-pilot/PROJECT.md',
       '.nubos-pilot/REQUIREMENTS.md',
       '.nubos-pilot/roadmap.yaml',
-      '.nubos-pilot/ROADMAP.md',
       '.nubos-pilot/STATE.md',
-      path.relative(root, contextMdPath),
+      path.relative(root, layout.milestoneContextPath(firstMilestoneNumber, root)),
+      path.relative(root, layout.milestoneRoadmapPath(firstMilestoneNumber, root)),
+      path.relative(root, layout.milestoneMetaPath(firstMilestoneNumber, root)),
     ],
   });
 }

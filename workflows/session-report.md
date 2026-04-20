@@ -1,6 +1,7 @@
 ---
 command: np:session-report
 description: Generate session report from metrics since .nubos-pilot/reports/.last-session pointer. Pointer update is file-lock-guarded (Pitfall 8). Output filename is ISO-8601-prefixed (YYYY-MM-DDTHHMM-session-report.md) for deterministic sort and no overwrite (D-17). Uses lib/metrics-aggregate.cjs.aggregateSession (D-18). One atomic docs commit.
+argument-hint: [--since=<ISO-date>]
 ---
 
 # np:session-report

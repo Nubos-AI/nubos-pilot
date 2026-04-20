@@ -48,12 +48,12 @@ after(() => {
 });
 
 test('PW-1: pause-work sets stopped_at and resume_file when current_task set', () => {
-  const root = makeRoot('06-01-T01');
+  const root = makeRoot('M006-S001-T0001');
   const cap = _capture();
   const p = subcmd.run([], { cwd: root, stdout: cap.stub });
   assert.equal(p.ok, true);
   assert.ok(/^\d{4}-\d{2}-\d{2}T/.test(p.stopped_at));
-  assert.equal(p.resume_file, '.nubos-pilot/checkpoints/06-01-T01.json');
+  assert.equal(p.resume_file, '.nubos-pilot/checkpoints/M006-S001-T0001.json');
 });
 
 test('PW-2: pause-work resume_file=null when no current_task', () => {
@@ -65,10 +65,10 @@ test('PW-2: pause-work resume_file=null when no current_task', () => {
 });
 
 test('PW-3: STATE.md on disk reflects the mutation', () => {
-  const root = makeRoot('06-01-T02');
+  const root = makeRoot('M006-S001-T0002');
   const cap = _capture();
   subcmd.run([], { cwd: root, stdout: cap.stub });
   const body = fs.readFileSync(path.join(root, '.nubos-pilot', 'STATE.md'), 'utf-8');
   assert.ok(/stopped_at: "?\d{4}-\d{2}-\d{2}T/.test(body), body);
-  assert.ok(body.includes('resume_file: .nubos-pilot/checkpoints/06-01-T02.json'), body);
+  assert.ok(body.includes('resume_file: .nubos-pilot/checkpoints/M006-S001-T0002.json'), body);
 });
