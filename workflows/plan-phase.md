@@ -1,6 +1,7 @@
 ---
 command: np:plan-phase
 description: Creates PLAN.md for a phase with a 2-iteration planner ↔ plan-checker verification loop.
+argument-hint: <phase-number> [--research]
 ---
 
 # np:plan-phase
@@ -16,6 +17,27 @@ multi-plan batching. One phase → one run → one PLAN.md (± `tasks/` when
 promotion triggers fire per Plan 05-04).
 
 ## Initialize
+
+### Parse Arguments
+
+Positional: `<phase-number>`. Flags: `--research` (auto-run `/np:research-phase`
+when RESEARCH.md is missing, instead of prompting via Gate 2).
+
+```bash
+PHASE=""
+RESEARCH_FLAG=0
+for arg in "$@"; do
+  case "$arg" in
+    --research) RESEARCH_FLAG=1 ;;
+    --*)        echo "Unknown flag: $arg" >&2; exit 2 ;;
+    *)          [[ -z "$PHASE" ]] && PHASE="$arg" ;;
+  esac
+done
+if [[ -z "$PHASE" ]]; then
+  echo "Usage: /np:plan-phase <phase-number> [--research]" >&2
+  exit 2
+fi
+```
 
 ```bash
 INIT=$(node np-tools.cjs init plan-phase init "$PHASE")
@@ -68,7 +90,21 @@ esac
 
 ### Gate 2 — Missing RESEARCH.md
 
-If `has_research == false` AND workflow config requires it:
+If `has_research == false` AND workflow config requires it.
+
+**When `--research` flag is set:** skip the interactive prompt. The
+orchestrator MUST first dispatch `/np:research-phase $PHASE`, wait for it to
+commit RESEARCH.md, then re-run the **Initialize** block above to refresh
+`has_research` before continuing. No Gate 2 question is shown.
+
+```bash
+if [[ "$has_research" == "false" && "$RESEARCH_FLAG" == "1" ]]; then
+  echo "research-auto: dispatching /np:research-phase $PHASE before planning" >&2
+  exit 42
+fi
+```
+
+Otherwise (flag not set), prompt the user:
 
 ```bash
 CHOICE=$(node np-tools.cjs askuser --json '{
@@ -86,6 +122,10 @@ case "$CHOICE" in
   "Abort")                   exit 0 ;;
 esac
 ```
+
+**Exit code 42 contract:** when the orchestrator sees exit 42, it MUST run
+`/np:research-phase $PHASE` and then re-enter `/np:plan-phase $PHASE`
+(without the `--research` flag — `has_research` will now be `true`).
 
 ### Gate 3 — PLAN.md already exists
 
@@ -342,10 +382,13 @@ PLAN.md + `tasks/` are gone, PLAN-REVIEW.md preserved. Exit 1.
 Return to the orchestrator:
 
 ```
-status:      passed | committed-with-warnings | aborted | manual-edit
+status:      passed | committed-with-warnings | aborted | manual-edit | research-dispatched
 iterations:  1 | 2 | 3
 plan_path:   <absolute path to PLAN.md, or null on abort>
 review_path: <absolute path to PLAN-REVIEW.md>
 promoted:    true | false
 triggers:    [parallelism, mixed-tiers, non-linear-deps]
 ```
+
+`research-dispatched` (exit 42) signals the orchestrator to run
+`/np:research-phase $PHASE` and re-enter `/np:plan-phase $PHASE` afterwards.
