@@ -223,13 +223,15 @@ Inside each `S<NNN>-PLAN.md`, every `<task>` tag MUST have these four attributes
 
 The scaffolder (`_extractTasksFromSlicePlan` in `bin/np-tools/plan-milestone.cjs`) reads ONLY these opening-tag attributes. Without them, zero task files are scaffolded and execute-phase has nothing to dispatch.
 
+Inside the body, every `<task>` MUST also contain a `<files_modified>` block listing the files the executor will touch (one per line or comma-separated). An empty or missing `<files_modified>` block produces `files_modified: []` in task frontmatter, which causes `commit-task` to fail (`commit-task-no-files`) unless the executor reported touched files via `checkpoint touch` as a runtime fallback. Plans MUST declare intent up-front; relying on the checkpoint fallback is a last-resort safety net.
+
 Correct example for `slices/S001/S001-PLAN.md`:
 
 ```
 <tasks>
 <task id="M001-S001-T0001" depends_on="" wave="1" tier="sonnet">
   <name>Seed login form</name>
-  <files>src/auth/LoginForm.tsx</files>
+  <files_modified>src/auth/LoginForm.tsx</files_modified>
   <read_first>
     - src/auth/AuthProvider.tsx
   </read_first>

@@ -163,10 +163,63 @@ function _extractTasksFromSlicePlan(planPath) {
   return out;
 }
 
+function _escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function _buildMilestoneRemap(mNum, cwd) {
+  const slices = layout.listSlices(mNum, cwd);
+  const remap = new Map();
+  for (const s of slices) {
+    const planPath = layout.slicePlanPath(mNum, s.number, cwd);
+    if (!fs.existsSync(planPath)) continue;
+    const tasks = _extractTasksFromSlicePlan(planPath);
+    tasks.forEach((t, idx) => {
+      const oldId = t.id;
+      if (!oldId) return;
+      const newId = layout.taskFullId(mNum, s.number, idx + 1);
+      if (oldId !== newId) remap.set(oldId, newId);
+    });
+  }
+  return remap;
+}
+
+function _rewriteSlicePlanIds(planPath, remap) {
+  if (remap.size === 0) return false;
+  const raw = fs.readFileSync(planPath, 'utf-8');
+  const keys = [...remap.keys()].sort((a, b) => b.length - a.length);
+  const re = new RegExp('\\b(' + keys.map(_escapeRegex).join('|') + ')\\b', 'g');
+  const next = raw.replace(re, (m) => remap.get(m) || m);
+  if (next === raw) return false;
+  atomicWriteFileSync(planPath, next);
+  return true;
+}
+
+function _normalizeMilestoneTaskIds(mNum, cwd) {
+  const remap = _buildMilestoneRemap(mNum, cwd);
+  if (remap.size === 0) return { changed: false, remap: {} };
+  const slices = layout.listSlices(mNum, cwd);
+  for (const s of slices) {
+    const planPath = layout.slicePlanPath(mNum, s.number, cwd);
+    if (!fs.existsSync(planPath)) continue;
+    _rewriteSlicePlanIds(planPath, remap);
+  }
+  return { changed: true, remap: Object.fromEntries(remap) };
+}
+
 function _extractInnerTag(body, tag) {
   const re = new RegExp('<' + tag + '(?:\\s[^>]*)?>([\\s\\S]*?)</' + tag + '>', 'i');
   const m = body.match(re);
   return m ? m[1].trim() : '';
+}
+
+function _parseFilesList(body) {
+  const raw = _extractInnerTag(body, 'files_modified') || _extractInnerTag(body, 'files');
+  if (!raw) return [];
+  return raw
+    .split(/[,\n]/)
+    .map((s) => s.trim().replace(/^[-*]\s+/, '').trim())
+    .filter(Boolean);
 }
 
 function _filesYaml(files) {
@@ -184,8 +237,7 @@ function _renderTaskPlanMd(task, mNum, sNum) {
   const parsed = fullId.match(/T(\d{4,})$/);
   const taskNum = parsed ? Number(parsed[1]) : 0;
   const name = _extractInnerTag(task.body, 'name') || fullId;
-  const files = _extractInnerTag(task.body, 'files');
-  const filesList = files ? files.split(/[,\n]/).map((s) => s.trim()).filter(Boolean) : [];
+  const filesList = _parseFilesList(task.body);
   const readFirst = _extractInnerTag(task.body, 'read_first');
   const action = _extractInnerTag(task.body, 'action');
   const verify = _extractInnerTag(task.body, 'verify');
@@ -258,6 +310,13 @@ function _scaffoldSliceTasks(mNum, sNum, cwd) {
   if (!fs.existsSync(planPath)) {
     return { scaffolded: [], reason: 'no-slice-plan', slice: layout.sliceFullId(mNum, sNum) };
   }
+  const sliceRemap = new Map();
+  const preTasks = _extractTasksFromSlicePlan(planPath);
+  preTasks.forEach((t, idx) => {
+    const newId = layout.taskFullId(mNum, sNum, idx + 1);
+    if (t.id && t.id !== newId) sliceRemap.set(t.id, newId);
+  });
+  _rewriteSlicePlanIds(planPath, sliceRemap);
   const tasks = _extractTasksFromSlicePlan(planPath);
   if (tasks.length === 0) {
     return { scaffolded: [], reason: 'no-tasks-in-slice-plan', slice: layout.sliceFullId(mNum, sNum) };
@@ -293,12 +352,19 @@ function _scaffoldAllTasks(mNum, cwd) {
   if (slices.length === 0) {
     return { scaffolded: [], reason: 'no-slices', milestone: layout.mId(mNum) };
   }
+  const normalized = _normalizeMilestoneTaskIds(mNum, cwd);
   const per = [];
   for (const s of slices) {
     per.push(_scaffoldSliceTasks(mNum, s.number, cwd));
   }
   const total = per.reduce((acc, p) => acc + (p.task_count || 0), 0);
-  return { scaffolded: per, reason: 'ok', milestone: layout.mId(mNum), total_tasks: total };
+  return {
+    scaffolded: per,
+    reason: 'ok',
+    milestone: layout.mId(mNum),
+    total_tasks: total,
+    normalized_ids: normalized.changed ? normalized.remap : {},
+  };
 }
 
 function _createMilestoneDir(mNum, cwd) {

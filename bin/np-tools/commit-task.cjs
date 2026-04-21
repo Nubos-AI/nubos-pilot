@@ -7,7 +7,7 @@ const { TASK_ID_RE, setTaskStatus } = require('../../lib/tasks.cjs');
 const layout = require('../../lib/layout.cjs');
 const git = require('../../lib/git.cjs');
 const { commitTask, findCommitByTaskId } = git;
-const { deleteCheckpoint } = require('../../lib/checkpoint.cjs');
+const { deleteCheckpoint, readCheckpoint } = require('../../lib/checkpoint.cjs');
 
 function _resolveTaskFile(taskId, cwd) {
   const parsed = layout.parseTaskFullId(taskId);
@@ -70,11 +70,21 @@ function run(args, ctx) {
   const { filePath } = _resolveTaskFile(taskId, cwd);
   const raw = fs.readFileSync(filePath, 'utf-8');
   const { frontmatter, body } = extractFrontmatter(raw);
-  const files = Array.isArray(frontmatter.files_modified) ? frontmatter.files_modified : [];
+  const declared = Array.isArray(frontmatter.files_modified) ? frontmatter.files_modified : [];
+  let files = declared.slice();
+  let filesSource = 'frontmatter';
+  if (files.length === 0) {
+    const cp = readCheckpoint(taskId, cwd);
+    const touched = cp && Array.isArray(cp.files_touched) ? cp.files_touched : [];
+    if (touched.length > 0) {
+      files = touched.slice();
+      filesSource = 'checkpoint';
+    }
+  }
   if (files.length === 0) {
     throw new NubosPilotError(
       'commit-task-no-files',
-      'Task ' + taskId + ' has empty files_modified',
+      'Task ' + taskId + ' has empty files_modified and no files_touched in checkpoint',
       { taskId },
     );
   }
@@ -93,7 +103,7 @@ function run(args, ctx) {
     process.stderr.write('[nubos-pilot warn] setTaskStatus failed for ' + taskId + ': ' + (err && err.message) + '\n');
   }
 
-  const payload = { ok: true, task_id: taskId, sha, files: safeFiles };
+  const payload = { ok: true, task_id: taskId, sha, files: safeFiles, files_source: filesSource };
   stdout.write(JSON.stringify(payload));
   return payload;
 }

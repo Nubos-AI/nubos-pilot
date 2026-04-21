@@ -207,3 +207,149 @@ test('PM-9: unknown verb throws', () => {
     (err) => err && err.code === 'plan-milestone-unknown-verb',
   );
 });
+
+test('PM-10: scaffold-all-tasks renumbers task ids per slice when planner numbered globally', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  const plan1 = [
+    '---', 'slice: "M001-S001"', 'milestone: "M001"', '---', '',
+    '<task id="M001-S001-T0001" wave="1" tier="sonnet" depends_on=""><name>A</name><action>A</action><done>D</done></task>',
+    '<task id="M001-S001-T0002" wave="1" tier="sonnet" depends_on=""><name>B</name><action>A</action><done>D</done></task>',
+    '<task id="M001-S001-T0003" wave="1" tier="sonnet" depends_on=""><name>C</name><action>A</action><done>D</done></task>',
+  ].join('\n');
+  const plan2 = [
+    '---', 'slice: "M001-S002"', 'milestone: "M001"', '---', '',
+    '<task id="M001-S002-T0004" wave="2" tier="sonnet" depends_on="M001-S001-T0003"><name>D</name><action>A</action><done>D</done></task>',
+    '<task id="M001-S002-T0005" wave="2" tier="sonnet" depends_on=""><name>E</name><action>A</action><done>D</done></task>',
+  ].join('\n');
+  const plan3 = [
+    '---', 'slice: "M001-S003"', 'milestone: "M001"', '---', '',
+    '<task id="M001-S003-T0006" wave="3" tier="sonnet" depends_on="M001-S002-T0004"><name>F</name><action>A</action><done>D</done></task>',
+    '<task id="M001-S003-T0007" wave="3" tier="sonnet" depends_on="M001-S002-T0005,M001-S001-T0001"><name>G</name><action>A</action><done>D</done></task>',
+  ].join('\n');
+  seedSliceDir(sandbox, 1, 1, { 'S001-PLAN.md': plan1 });
+  seedSliceDir(sandbox, 1, 2, { 'S002-PLAN.md': plan2 });
+  seedSliceDir(sandbox, 1, 3, { 'S003-PLAN.md': plan3 });
+
+  const cap = _capture();
+  subcmd.run(['scaffold-all-tasks', '1'], { cwd: sandbox, stdout: cap.stub });
+  const out = JSON.parse(cap.get().trim());
+  assert.equal(out.reason, 'ok');
+  assert.equal(out.total_tasks, 7);
+
+  const tasksBase = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices');
+  assert.ok(fs.existsSync(path.join(tasksBase, 'S001', 'tasks', 'T0001')));
+  assert.ok(fs.existsSync(path.join(tasksBase, 'S001', 'tasks', 'T0002')));
+  assert.ok(fs.existsSync(path.join(tasksBase, 'S001', 'tasks', 'T0003')));
+  assert.ok(fs.existsSync(path.join(tasksBase, 'S002', 'tasks', 'T0001')));
+  assert.ok(fs.existsSync(path.join(tasksBase, 'S002', 'tasks', 'T0002')));
+  assert.ok(!fs.existsSync(path.join(tasksBase, 'S002', 'tasks', 'T0004')));
+  assert.ok(fs.existsSync(path.join(tasksBase, 'S003', 'tasks', 'T0001')));
+  assert.ok(fs.existsSync(path.join(tasksBase, 'S003', 'tasks', 'T0002')));
+  assert.ok(!fs.existsSync(path.join(tasksBase, 'S003', 'tasks', 'T0006')));
+
+  const s2t1 = fs.readFileSync(path.join(tasksBase, 'S002', 'tasks', 'T0001', 'T0001-PLAN.md'), 'utf-8');
+  assert.match(s2t1, /id: "M001-S002-T0001"/);
+  assert.match(s2t1, /- "M001-S001-T0003"/);
+
+  const s3t1 = fs.readFileSync(path.join(tasksBase, 'S003', 'tasks', 'T0001', 'T0001-PLAN.md'), 'utf-8');
+  assert.match(s3t1, /id: "M001-S003-T0001"/);
+  assert.match(s3t1, /- "M001-S002-T0001"/);
+
+  const s3t2 = fs.readFileSync(path.join(tasksBase, 'S003', 'tasks', 'T0002', 'T0002-PLAN.md'), 'utf-8');
+  assert.match(s3t2, /id: "M001-S003-T0002"/);
+  assert.match(s3t2, /- "M001-S002-T0002"/);
+  assert.match(s3t2, /- "M001-S001-T0001"/);
+
+  const s2PlanRaw = fs.readFileSync(path.join(tasksBase, 'S002', 'S002-PLAN.md'), 'utf-8');
+  assert.match(s2PlanRaw, /id="M001-S002-T0001"/);
+  assert.match(s2PlanRaw, /id="M001-S002-T0002"/);
+  assert.doesNotMatch(s2PlanRaw, /T0004/);
+  assert.doesNotMatch(s2PlanRaw, /T0005/);
+
+  assert.deepEqual(out.normalized_ids['M001-S002-T0004'], 'M001-S002-T0001');
+  assert.deepEqual(out.normalized_ids['M001-S002-T0005'], 'M001-S002-T0002');
+  assert.deepEqual(out.normalized_ids['M001-S003-T0006'], 'M001-S003-T0001');
+  assert.deepEqual(out.normalized_ids['M001-S003-T0007'], 'M001-S003-T0002');
+});
+
+test('PM-11: scaffold-all-tasks is idempotent — already-normalized ids stay unchanged', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  const plan1 = [
+    '---', 'slice: "M001-S001"', 'milestone: "M001"', '---', '',
+    '<task id="M001-S001-T0001" wave="1" tier="sonnet" depends_on=""><name>A</name><action>A</action><done>D</done></task>',
+  ].join('\n');
+  const plan2 = [
+    '---', 'slice: "M001-S002"', 'milestone: "M001"', '---', '',
+    '<task id="M001-S002-T0001" wave="2" tier="sonnet" depends_on="M001-S001-T0001"><name>B</name><action>A</action><done>D</done></task>',
+  ].join('\n');
+  seedSliceDir(sandbox, 1, 1, { 'S001-PLAN.md': plan1 });
+  seedSliceDir(sandbox, 1, 2, { 'S002-PLAN.md': plan2 });
+
+  subcmd.run(['scaffold-all-tasks', '1'], { cwd: sandbox, stdout: _capture().stub });
+  const cap = _capture();
+  subcmd.run(['scaffold-all-tasks', '1'], { cwd: sandbox, stdout: cap.stub });
+  const out = JSON.parse(cap.get().trim());
+  assert.deepEqual(out.normalized_ids, {});
+});
+
+test('PM-13: scaffold accepts <files_modified> tag and strips bullet prefixes', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  const slicePlan = [
+    '---', 'slice: "M001-S001"', 'milestone: "M001"', '---', '',
+    '<task id="M001-S001-T0001" wave="1" tier="sonnet" depends_on="">',
+    '  <name>Multi-file task</name>',
+    '  <files_modified>',
+    '    - src/a.ts',
+    '    - src/b.ts',
+    '    - src/c.ts',
+    '  </files_modified>',
+    '  <action>Touch three files.</action>',
+    '  <done>Done.</done>',
+    '</task>',
+  ].join('\n');
+  seedSliceDir(sandbox, 1, 1, { 'S001-PLAN.md': slicePlan });
+  subcmd.run(['scaffold-slice-tasks', '1', '1'], { cwd: sandbox, stdout: _capture().stub });
+  const body = fs.readFileSync(
+    path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices', 'S001', 'tasks', 'T0001', 'T0001-PLAN.md'),
+    'utf-8',
+  );
+  assert.match(body, /- "src\/a.ts"/);
+  assert.match(body, /- "src\/b.ts"/);
+  assert.match(body, /- "src\/c.ts"/);
+  assert.doesNotMatch(body, /- "- /);
+});
+
+test('PM-12: scaffold-slice-tasks renumbers its own slice when ids do not start at T0001', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  const plan2 = [
+    '---', 'slice: "M001-S002"', 'milestone: "M001"', '---', '',
+    '<task id="M001-S002-T0004" wave="2" tier="sonnet" depends_on=""><name>A</name><action>A</action><done>D</done></task>',
+    '<task id="M001-S002-T0005" wave="2" tier="sonnet" depends_on=""><name>B</name><action>A</action><done>D</done></task>',
+  ].join('\n');
+  seedSliceDir(sandbox, 1, 2, { 'S002-PLAN.md': plan2 });
+
+  const cap = _capture();
+  subcmd.run(['scaffold-slice-tasks', '1', '2'], { cwd: sandbox, stdout: cap.stub });
+  const out = JSON.parse(cap.get().trim());
+  assert.equal(out.task_count, 2);
+
+  const tasksBase = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices', 'S002', 'tasks');
+  assert.ok(fs.existsSync(path.join(tasksBase, 'T0001')));
+  assert.ok(fs.existsSync(path.join(tasksBase, 'T0002')));
+  assert.ok(!fs.existsSync(path.join(tasksBase, 'T0004')));
+
+  const planRaw = fs.readFileSync(
+    path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices', 'S002', 'S002-PLAN.md'),
+    'utf-8',
+  );
+  assert.match(planRaw, /id="M001-S002-T0001"/);
+  assert.doesNotMatch(planRaw, /T0004/);
+});

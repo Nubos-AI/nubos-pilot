@@ -158,3 +158,40 @@ test('CT-5: commit-task unknown task id → task-not-found', () => {
     (err) => err && err.code === 'commit-task-not-found',
   );
 });
+
+test('CT-6: empty files_modified falls back to checkpoint.files_touched', () => {
+  const root = makeRepo();
+  seedPlanAndTask(root, '06-01', 'M006-S001-T0010', []);
+  fs.mkdirSync(path.join(root, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'src', 'b.ts'), 'export const b = 2;\n', 'utf-8');
+  const cpPath = path.join(root, '.nubos-pilot', 'checkpoints', 'M006-S001-T0010.json');
+  fs.mkdirSync(path.dirname(cpPath), { recursive: true });
+  fs.writeFileSync(cpPath, JSON.stringify({
+    schema_version: 1,
+    task_id: 'M006-S001-T0010',
+    status: 'pre-commit',
+    files_touched: ['src/b.ts'],
+  }), 'utf-8');
+  const prev = process.cwd();
+  process.chdir(root);
+  const cap = _capture();
+  try {
+    subcmd.run(['M006-S001-T0010'], { cwd: root, stdout: cap.stub });
+  } finally {
+    process.chdir(prev);
+  }
+  const payload = JSON.parse(cap.get());
+  assert.equal(payload.ok, true);
+  assert.equal(payload.files_source, 'checkpoint');
+  assert.deepEqual(payload.files, ['src/b.ts']);
+});
+
+test('CT-7: empty files_modified AND no checkpoint → commit-task-no-files', () => {
+  const root = makeRepo();
+  seedPlanAndTask(root, '06-01', 'M006-S001-T0011', []);
+  const cap = _capture();
+  assert.throws(
+    () => subcmd.run(['M006-S001-T0011'], { cwd: root, stdout: cap.stub }),
+    (err) => err && err.code === 'commit-task-no-files',
+  );
+});
