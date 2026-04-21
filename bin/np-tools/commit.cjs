@@ -2,6 +2,7 @@ const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 const { NubosPilotError } = require('../../lib/core.cjs');
 const { assertCommittablePaths } = require('../../lib/git.cjs');
+const { resolveCommitArtifacts } = require('../../lib/commit-policy.cjs');
 
 const MAX_MSG = 2000;
 
@@ -65,6 +66,7 @@ function _validateFiles(files) {
 
 function run(argv, ctx) {
   const context = ctx || {};
+  const cwd = context.cwd || process.cwd();
   const stdout = context.stdout || process.stdout;
   const stderr = context.stderr || process.stderr;
   try {
@@ -81,6 +83,10 @@ function run(argv, ctx) {
       return 1;
     }
     _validateFiles(files);
+    if (resolveCommitArtifacts(cwd) === false) {
+      stdout.write(JSON.stringify({ committed: false, reason: 'commit_artifacts=false', files }) + '\n');
+      return 0;
+    }
     const committable = assertCommittablePaths(files);
     if (committable.length === 0) {
       throw new NubosPilotError('commit-no-paths', 'commit invoked with no committable paths', { files });

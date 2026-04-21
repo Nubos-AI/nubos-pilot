@@ -91,3 +91,47 @@ test('COMMIT-4: overlong message exceeds limit → commit-message-too-long', () 
   assert.equal(code, 1);
   assert.match(stderr.toString(), /"code":\s*"commit-message-too-long"/);
 });
+
+test('COMMIT-5: workflow.commit_artifacts=false skips commit silently with exit 0', () => {
+  const sb = makeSandbox();
+  initGit(sb);
+  fs.writeFileSync(path.join(sb, 'note.md'), 'x');
+  fs.writeFileSync(
+    path.join(sb, '.nubos-pilot', 'config.json'),
+    JSON.stringify({ workflow: { commit_artifacts: false } }),
+  );
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = commitCli.run(['docs: note', '--files', 'note.md'], { cwd: sb, stdout, stderr });
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  const out = stdout.toString();
+  assert.match(out, /"committed":\s*false/);
+  assert.match(out, /"reason":\s*"commit_artifacts=false"/);
+  let logOut = '';
+  try {
+    logOut = execFileSync('git', ['log', '--oneline'], { cwd: sb, encoding: 'utf-8' }).trim();
+  } catch { logOut = ''; }
+  assert.equal(logOut, '', 'expected no commits to be created');
+});
+
+test('COMMIT-6: workflow.commit_artifacts=true still commits normally', () => {
+  const sb = makeSandbox();
+  initGit(sb);
+  fs.writeFileSync(path.join(sb, 'note.md'), 'x');
+  fs.writeFileSync(
+    path.join(sb, '.nubos-pilot', 'config.json'),
+    JSON.stringify({ workflow: { commit_artifacts: true } }),
+  );
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const origCwd = process.cwd();
+  process.chdir(sb);
+  let code;
+  try {
+    code = commitCli.run(['docs: note', '--files', 'note.md'], { stdout, stderr });
+  } finally {
+    process.chdir(origCwd);
+  }
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  assert.match(stdout.toString(), /"committed":\s*true/);
+});

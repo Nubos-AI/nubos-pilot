@@ -17,7 +17,7 @@ Slice-level acceptance (UAT) is validated separately by `/np:validate-phase <N>`
 ```bash
 PHASE="$1"
 LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
-INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work init "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_VERIFIER=$(node .nubos-pilot/bin/np-tools.cjs agent-skills verifier 2>/dev/null)
 ```

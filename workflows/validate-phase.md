@@ -20,7 +20,7 @@ if [[ -z "$PHASE" ]]; then
 fi
 
 LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
-INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init verify-work init "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 RUNTIME=$(node .nubos-pilot/bin/np-tools.cjs detect-runtime)
 ```

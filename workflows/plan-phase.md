@@ -277,8 +277,11 @@ The scaffolder:
 ## Commit
 
 ```bash
-git add "$milestone_dir"
-git commit -m "docs(${milestone_id}): milestone plan ready for execute"
+COMMIT_ARTIFACTS=$(node .nubos-pilot/bin/np-tools.cjs config-get workflow.commit_artifacts 2>/dev/null || echo "true")
+if [[ "$COMMIT_ARTIFACTS" != "false" ]]; then
+  git add "$milestone_dir"
+  git commit -m "docs(${milestone_id}): milestone plan ready for execute"
+fi
 ```
 
 Commits include: all milestone-level artefacts (CONTEXT/ROADMAP/META), every slice's ASSESSMENT/PLAN/UAT, and every scaffolded task file.

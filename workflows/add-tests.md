@@ -17,7 +17,7 @@ sentinels survive regeneration.
 
 ```bash
 PHASE="$1"
-INIT=$(node .nubos-pilot/bin/np-tools.cjs init add-tests "$PHASE")
+INIT=$(node .nubos-pilot/bin/np-tools.cjs init add-tests init "$PHASE")
 ```
 
 Parse: `phase`, `target_path`, `verification_path`, `pass_cases[]`,
