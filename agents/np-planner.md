@@ -216,7 +216,7 @@ If any check fails, fix before returning. Plan-checker will catch what you miss,
 
 Inside each `S<NNN>-PLAN.md`, every `<task>` tag MUST have these four attributes on the opening tag:
 
-- `id="M<NNN>-S<NNN>-T<NNNN>"` — full-id, e.g. `id="M001-S001-T0001"`. Milestone 3 digits, slice 3 digits, task **4 digits**.
+- `id="M<NNN>-S<NNN>-T<NNNN>"` — full-id, e.g. `id="M001-S001-T0001"`. Milestone 3 digits, slice 3 digits, task **4 digits**. **Task numbering restarts at `T0001` inside every slice.** The first task of `S002` is `M<NNN>-S002-T0001`, the first task of `S003` is `M<NNN>-S003-T0001`. Tasks within a slice run `T0001, T0002, T0003, …` without gaps. Never continue the counter across slices (`S001-T0001, S002-T0002` is wrong — it must be `S001-T0001, S002-T0001`).
 - `depends_on="<id>[,<id>...]"` — comma-separated predecessor task full-ids, or empty string `""`. Must only reference tasks in **earlier slices** (cross-slice forward deps) or be empty (intra-slice tasks are implicitly parallel, never serial).
 - `wave="<N>"` — integer equal to the slice number. For S001 use `wave="1"`, for S002 use `wave="2"`, etc.
 - `tier="<haiku|sonnet|opus>"` — executor tier, picks the model via resolve-model.
@@ -257,7 +257,16 @@ Create `LoginForm.tsx` with email + password inputs. Wire it to the
 </tasks>
 ```
 
-Note both tasks have `depends_on=""` — they're in the same slice and run in parallel. If `T0002` truly needs `T0001` first, move `T0002` into a new slice `S002` and write `depends_on="M001-S001-T0001" wave="2"`.
+Note both tasks have `depends_on=""` — they're in the same slice and run in parallel. If `T0002` truly needs `T0001` first, move `T0002` into a new slice `S002` and renumber it to `T0001` — each slice owns its own task counter:
+
+```
+<task id="M001-S002-T0001" depends_on="M001-S001-T0001" wave="2" tier="sonnet">
+  <name>Use login handler in session flow</name>
+  ...
+</task>
+```
+
+The cross-slice dep `M001-S001-T0001` flows forward (S001 → S002); the new task is `T0001` of S002, not `T0003`.
 </task_format>
 
 <tooling_conventions>

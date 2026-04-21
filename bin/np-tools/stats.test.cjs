@@ -87,15 +87,97 @@ test('STATS-1: stats json emits schema_version + phases + git + metrics_by_phase
   const code = await statsCli.run(['json'], { cwd: sb, stdout, stderr });
   assert.equal(code, 0, 'stderr=' + stderr.toString());
   const parsed = JSON.parse(stdout.toString());
-  assert.equal(parsed.schema_version, 1);
+  assert.equal(parsed.schema_version, 2);
   assert.ok(parsed.milestone);
   assert.equal(parsed.phases.length, 2);
   assert.equal(parsed.plans_total, 2);
   assert.equal(parsed.plans_complete, 1);
   assert.equal(parsed.percent, 50);
+  assert.ok(parsed.tasks);
+  assert.equal(typeof parsed.tasks.total, 'number');
+  assert.equal(typeof parsed.tasks.complete, 'number');
+  assert.equal(typeof parsed.tasks.percent, 'number');
+  assert.ok(parsed.slices);
+  assert.equal(typeof parsed.slices.total, 'number');
+  assert.equal(typeof parsed.slices.complete, 'number');
+  assert.equal(typeof parsed.slices.percent, 'number');
   assert.ok(parsed.git);
   assert.ok(typeof parsed.git.commits === 'number');
   assert.ok(parsed.metrics_by_phase);
+});
+
+function writeTaskPlan(root, mNum, sNum, tNum, status) {
+  const mid = 'M' + String(mNum).padStart(3, '0');
+  const sid = 'S' + String(sNum).padStart(3, '0');
+  const tid = 'T' + String(tNum).padStart(4, '0');
+  const dir = path.join(root, '.nubos-pilot', 'milestones', mid, 'slices', sid, 'tasks', tid);
+  fs.mkdirSync(dir, { recursive: true });
+  const fm = [
+    '---',
+    `id: ${mid}-${sid}-${tid}`,
+    `slice: ${mid}-${sid}`,
+    `milestone: ${mid}`,
+    'type: execute',
+    `status: ${status}`,
+    'tier: sonnet',
+    'owner: executor',
+    `wave: ${sNum}`,
+    'depends_on: []',
+    'files_modified: []',
+    'autonomous: true',
+    'must_haves: {}',
+    '---',
+    '',
+    `# ${mid}-${sid}-${tid}`,
+    '',
+  ].join('\n');
+  fs.writeFileSync(path.join(dir, tid + '-PLAN.md'), fm);
+}
+
+test('STATS-4: tasks + slices percent reflect filesystem task status', async () => {
+  const sb = makeSandbox(DEMO_YAML, DEMO_STATE);
+  writeTaskPlan(sb, 1, 1, 1, 'done');
+  writeTaskPlan(sb, 1, 1, 2, 'done');
+  writeTaskPlan(sb, 1, 2, 1, 'done');
+  writeTaskPlan(sb, 1, 2, 2, 'pending');
+  writeTaskPlan(sb, 1, 3, 1, 'pending');
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = await statsCli.run(['json'], { cwd: sb, stdout, stderr });
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  const parsed = JSON.parse(stdout.toString());
+  assert.equal(parsed.tasks.total, 5);
+  assert.equal(parsed.tasks.complete, 3);
+  assert.equal(parsed.tasks.percent, 60);
+  assert.equal(parsed.slices.total, 3);
+  assert.equal(parsed.slices.complete, 1, 'only S001 has all tasks done');
+  assert.equal(parsed.slices.percent, 33);
+});
+
+test('STATS-5: tasks + slices are 0 when nothing scaffolded', async () => {
+  const sb = makeSandbox(DEMO_YAML, DEMO_STATE);
+  const stdout = makeSink();
+  const stderr = makeSink();
+  await statsCli.run(['json'], { cwd: sb, stdout, stderr });
+  const parsed = JSON.parse(stdout.toString());
+  assert.equal(parsed.tasks.total, 0);
+  assert.equal(parsed.tasks.percent, 0);
+  assert.equal(parsed.slices.total, 0);
+  assert.equal(parsed.slices.percent, 0);
+});
+
+test('STATS-6: stats bar renders two progress rows on stdout', async () => {
+  const sb = makeSandbox(DEMO_YAML, DEMO_STATE);
+  writeTaskPlan(sb, 1, 1, 1, 'done');
+  writeTaskPlan(sb, 1, 1, 2, 'pending');
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = await statsCli.run(['bar'], { cwd: sb, stdout, stderr });
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  const out = stdout.toString();
+  assert.match(out, /Tasks .*\d+%/);
+  assert.match(out, /Slices.*\d+%/);
+  assert.match(out, /1\/2/);
 });
 
 test('STATS-2: unknown subcommand prints usage', async () => {

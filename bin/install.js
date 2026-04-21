@@ -663,6 +663,12 @@ function _runUninstallLocked(projectRoot) {
 
 async function main() {
   const rawArgs = process.argv.slice(2);
+  if (rawArgs.includes('--version') || rawArgs.includes('-v')) {
+    let version = '0.0.0';
+    try { version = String(require('../package.json').version || '0.0.0'); } catch {}
+    process.stdout.write(version + '\n');
+    return;
+  }
   const { flags, rest } = parseInstallFlags(rawArgs);
   const sub = rest[0];
   const cwd = process.cwd();

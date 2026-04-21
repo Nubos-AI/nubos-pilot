@@ -1,14 +1,78 @@
+const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { NubosPilotError, findProjectRoot } = require('../../lib/core.cjs');
 const { parseRoadmap } = require('../../lib/roadmap.cjs');
 const { readState } = require('../../lib/state.cjs');
 const { aggregatePhase } = require('../../lib/metrics-aggregate.cjs');
+const { extractFrontmatter } = require('../../lib/frontmatter.cjs');
+const layout = require('../../lib/layout.cjs');
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 function _usage() {
-  return 'Usage:\n  np-tools.cjs stats json';
+  return 'Usage:\n  np-tools.cjs stats json\n  np-tools.cjs stats bar';
+}
+
+function _percent(num, den) {
+  if (!den || den <= 0) return 0;
+  return Math.min(100, Math.round((num / den) * 100));
+}
+
+function _taskStatus(planPath) {
+  try {
+    const raw = fs.readFileSync(planPath, 'utf-8');
+    const { frontmatter } = extractFrontmatter(raw);
+    return frontmatter && typeof frontmatter.status === 'string'
+      ? frontmatter.status : null;
+  } catch {
+    return null;
+  }
+}
+
+function _collectTaskAndSliceStats(cwd) {
+  let tasksTotal = 0;
+  let tasksComplete = 0;
+  let slicesTotal = 0;
+  let slicesComplete = 0;
+  const milestones = layout.listMilestones(cwd);
+  for (const m of milestones) {
+    const slices = layout.listSlices(m.number, cwd);
+    for (const s of slices) {
+      slicesTotal += 1;
+      const tasks = layout.listTasks(m.number, s.number, cwd);
+      if (tasks.length === 0) continue;
+      let doneInSlice = 0;
+      for (const t of tasks) {
+        if (!fs.existsSync(t.plan_path)) continue;
+        tasksTotal += 1;
+        if (_taskStatus(t.plan_path) === 'done') {
+          tasksComplete += 1;
+          doneInSlice += 1;
+        }
+      }
+      if (doneInSlice === tasks.length && tasks.length > 0) slicesComplete += 1;
+    }
+  }
+  return {
+    tasks: {
+      total: tasksTotal,
+      complete: tasksComplete,
+      percent: _percent(tasksComplete, tasksTotal),
+    },
+    slices: {
+      total: slicesTotal,
+      complete: slicesComplete,
+      percent: _percent(slicesComplete, slicesTotal),
+    },
+  };
+}
+
+function _renderBar(label, percent, width) {
+  const w = Math.max(4, Math.min(60, width || 24));
+  const filled = Math.round((percent / 100) * w);
+  const bar = '█'.repeat(filled) + '░'.repeat(w - filled);
+  return label + ' [' + bar + '] ' + String(percent).padStart(3, ' ') + '%';
 }
 
 function _emitError(err, stderr) {
@@ -81,7 +145,8 @@ async function _buildStats(cwd) {
     plansTotal += ph.plans_total;
     plansComplete += ph.plans_complete;
   }
-  const percent = plansTotal > 0 ? Math.round((plansComplete / plansTotal) * 100) : 0;
+  const percent = _percent(plansComplete, plansTotal);
+  const fs_progress = _collectTaskAndSliceStats(useCwd);
   let lastActivity = null;
   try {
     const st = readState(useCwd);
@@ -108,6 +173,8 @@ async function _buildStats(cwd) {
     plans_total: plansTotal,
     plans_complete: plansComplete,
     percent,
+    tasks: fs_progress.tasks,
+    slices: fs_progress.slices,
     git,
     last_activity: lastActivity,
     metrics_by_phase,
@@ -121,7 +188,7 @@ async function run(argv, ctx) {
   const stderr = context.stderr || process.stderr;
   const args = Array.isArray(argv) ? argv.slice() : [];
   const sub = args.shift();
-  if (sub !== 'json') {
+  if (sub !== 'json' && sub !== 'bar') {
     stderr.write(_usage() + '\n');
     return 1;
   }
@@ -133,6 +200,11 @@ async function run(argv, ctx) {
   }
   try {
     const out = await _buildStats(cwd);
+    if (sub === 'bar') {
+      stdout.write(_renderBar('Tasks ', out.tasks.percent) + '  (' + out.tasks.complete + '/' + out.tasks.total + ')\n');
+      stdout.write(_renderBar('Slices', out.slices.percent) + '  (' + out.slices.complete + '/' + out.slices.total + ')\n');
+      return 0;
+    }
     stdout.write(JSON.stringify(out, null, 2) + '\n');
     return 0;
   } catch (err) {
@@ -141,7 +213,7 @@ async function run(argv, ctx) {
   }
 }
 
-module.exports = { run, _buildStats, _collectPhases, _milestoneEntry };
+module.exports = { run, _buildStats, _collectPhases, _milestoneEntry, _collectTaskAndSliceStats, _renderBar };
 
 if (require.main === module) {
   run(process.argv.slice(2)).then((code) => process.exit(code)).catch((err) => {

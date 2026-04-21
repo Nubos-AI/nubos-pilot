@@ -95,7 +95,7 @@ payload; larger payloads are written to a tmp file and referenced via
 LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 INIT=$(node .nubos-pilot/bin/np-tools.cjs init research-phase "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
-RUNTIME=$(node -e "console.log(require('./lib/runtime/index.cjs').detect().runtime)")
+RUNTIME=$(node .nubos-pilot/bin/np-tools.cjs detect-runtime)
 ```
 
 **Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**

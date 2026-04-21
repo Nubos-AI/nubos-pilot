@@ -47,6 +47,7 @@ const COMMANDS = [
   { name: 'text-mode',       category: 'Utility', description: 'Print whether text mode is active (config.workflow.text_mode ∨ CLAUDECODE)' },
   { name: 'generate-slug',   category: 'Utility', description: 'Slugify text via lib/layout.cjs.slugify' },
   { name: 'stats',           category: 'Utility', description: 'Aggregated project stats (roadmap + STATE + git + metrics JSON shape)' },
+  { name: 'detect-runtime',  category: 'Utility', description: 'Print detected runtime id (claude, codex, gemini, …) — reads config.json ∨ env ∨ default' },
 
   { name: 'thread',           category: 'Utility', description: 'Cross-session thread CRUD (create/resume under .nubos-pilot/threads/)' },
   { name: 'session-report',   category: 'Utility', description: 'Generate session report from metrics since .last-session pointer' },

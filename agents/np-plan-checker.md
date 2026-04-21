@@ -89,6 +89,7 @@ Run each dimension below; for every failure, emit one finding using the matching
 - Every `<task>` MUST have `id="M<NNN>-S<NNN>-T<NNNN>"` matching the enclosing slice (milestone and slice numbers must agree with the file path). Mismatch → `broken-dependency`.
 - Missing `depends_on`, `wave`, or `tier` attribute on the opening `<task>` tag → the scaffolder will drop it. Emit `fake-promotion-trigger` with a message telling the planner which task is missing which attribute.
 - `wave="<N>"` should equal the slice's S-number (e.g. S002 → wave="2"). Mismatch is a soft finding (`fake-promotion-trigger`).
+- **Task numbering restarts per slice.** Inside each `S<NNN>-PLAN.md`, the task IDs MUST start at `T0001` and increment contiguously (`T0001, T0002, …`). Counter that continues across slices (e.g. `S002` starting at `T0002` because `S001` used `T0001`) → `broken-dependency` with `target: S<NNN>-PLAN.md task <n>` and a message naming the expected vs. observed T-number. Gaps (`T0001, T0003`) are the same finding.
 
 ### Dimension 7: Nyquist Coverage Annotation
 
