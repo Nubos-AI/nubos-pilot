@@ -136,7 +136,16 @@ for WAVE_INDEX in 0 1 2 ...; do
     fi
   done
   # wait for all parallel executors in this wave to finish before next wave
+
+  # After every task in the slice committed: aggregate per-task summaries into
+  # the slice-level S<NNN>-SUMMARY.md so /np:validate-phase can audit it.
+  SLICE_NUM=$(echo "$WAVE" | node -e "process.stdin.on('data', d => console.log(JSON.parse(d).wave))")
+  node .nubos-pilot/bin/np-tools.cjs init execute-milestone finalize-slice "$PHASE" "$SLICE_NUM" >/dev/null
 done
+
+# Milestone done — regenerate every slice summary so retroactive / resumed
+# runs also end with a complete audit surface.
+node .nubos-pilot/bin/np-tools.cjs init execute-milestone finalize-milestone "$PHASE" >/dev/null
 ```
 
 After every slice completes, point the operator at `/np:validate-phase $PHASE` to run the UAT per slice.

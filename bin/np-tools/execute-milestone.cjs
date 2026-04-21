@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const {
   NubosPilotError,
   projectStateDir,
+  atomicWriteFileSync,
 } = require('../../lib/core.cjs');
 const layout = require('../../lib/layout.cjs');
 const { getPhase } = require('../../lib/roadmap.cjs');
@@ -141,6 +142,84 @@ function _initPayload(mNum, cwd) {
   };
 }
 
+function _readTaskSummaryBody(summaryPath) {
+  if (!fs.existsSync(summaryPath)) return null;
+  const raw = fs.readFileSync(summaryPath, 'utf-8');
+  const { body } = extractFrontmatter(raw);
+  return String(body || '').trim();
+}
+
+function _finalizeSlice(mNum, sNum, cwd) {
+  const slicePath = layout.findSliceDir(mNum, sNum, cwd);
+  if (!slicePath) {
+    throw new NubosPilotError(
+      'finalize-slice-not-found',
+      'Slice ' + layout.sliceFullId(mNum, sNum) + ' does not exist',
+      { milestone: mNum, slice: sNum },
+    );
+  }
+  const summaryPath = layout.sliceSummaryPath(mNum, sNum, cwd);
+  const tasks = _sliceTasksSorted(mNum, sNum, cwd);
+  const doneTasks = tasks.filter((t) => t.status === 'done');
+  const pendingTasks = tasks.filter((t) => t.status !== 'done');
+
+  const lines = [
+    '---',
+    'slice: ' + JSON.stringify(layout.sliceFullId(mNum, sNum)),
+    'milestone: ' + JSON.stringify(layout.mId(mNum)),
+    'type: slice-summary',
+    'task_count: ' + tasks.length,
+    'tasks_done: ' + doneTasks.length,
+    'tasks_pending: ' + pendingTasks.length,
+    'generated_at: ' + JSON.stringify(new Date().toISOString()),
+    '---',
+    '',
+    '# ' + layout.sliceFullId(mNum, sNum) + ' — SUMMARY',
+    '',
+    '_Auto-aggregated from task summaries by `execute-milestone finalize-slice`._',
+    '',
+    '## Task Roll-Up',
+    '',
+    '| Task | Status | Name |',
+    '|------|--------|------|',
+  ];
+  for (const t of tasks) {
+    lines.push('| ' + t.id + ' | ' + t.status + ' | ' + (t.name || '').replace(/\|/g, '\\|') + ' |');
+  }
+  lines.push('', '## Task Summaries', '');
+  for (const t of tasks) {
+    lines.push('### ' + t.id + ' — ' + (t.name || ''));
+    lines.push('');
+    const body = _readTaskSummaryBody(t.summary_path);
+    if (body) {
+      lines.push(body);
+    } else {
+      lines.push('_No T<NNNN>-SUMMARY.md file present._');
+    }
+    lines.push('');
+  }
+  atomicWriteFileSync(summaryPath, lines.join('\n'));
+  return {
+    slice: layout.sliceFullId(mNum, sNum),
+    summary_path: summaryPath,
+    task_count: tasks.length,
+    tasks_done: doneTasks.length,
+    tasks_pending: pendingTasks.length,
+  };
+}
+
+function _finalizeMilestone(mNum, cwd) {
+  const slices = layout.listSlices(mNum, cwd);
+  if (slices.length === 0) {
+    return { milestone: layout.mId(mNum), finalized: [], reason: 'no-slices' };
+  }
+  const finalized = [];
+  for (const s of slices) {
+    finalized.push(_finalizeSlice(mNum, s.number, cwd));
+  }
+  return { milestone: layout.mId(mNum), finalized, reason: 'ok' };
+}
+
 function _findTaskByFullId(mNum, taskFullId, cwd) {
   let parsed;
   try {
@@ -215,6 +294,19 @@ function run(args, ctx) {
         );
       }
       const payload = _findTaskByFullId(mNum, taskId, cwd);
+      _emit(payload, stdout, cwd);
+      return payload;
+    }
+    case 'finalize-slice': {
+      const mNum = _validateMilestoneArg(list[1]);
+      const sNum = _validateMilestoneArg(list[2]);
+      const payload = _finalizeSlice(mNum, sNum, cwd);
+      _emit(payload, stdout, cwd);
+      return payload;
+    }
+    case 'finalize-milestone': {
+      const mNum = _validateMilestoneArg(list[1]);
+      const payload = _finalizeMilestone(mNum, cwd);
       _emit(payload, stdout, cwd);
       return payload;
     }

@@ -152,3 +152,98 @@ test('EM-6: unknown verb throws', () => {
     (err) => err && err.code === 'execute-milestone-unknown-verb',
   );
 });
+
+function _writeTaskSummary(sandbox, mNum, sNum, tNum, body) {
+  const mId = 'M' + String(mNum).padStart(3, '0');
+  const sId = 'S' + String(sNum).padStart(3, '0');
+  const tId = 'T' + String(tNum).padStart(4, '0');
+  const fullId = mId + '-' + sId + '-' + tId;
+  const dir = path.join(sandbox, '.nubos-pilot', 'milestones', mId, 'slices', sId, 'tasks', tId);
+  const content = [
+    '---',
+    'id: ' + JSON.stringify(fullId),
+    'status: done',
+    '---',
+    '',
+    body,
+    '',
+  ].join('\n');
+  fs.writeFileSync(path.join(dir, tId + '-SUMMARY.md'), content);
+}
+
+test('EM-7: finalize-slice writes S<NNN>-SUMMARY.md aggregating task summaries', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  seedSliceDir(sandbox, 1, 1, {});
+  _seedTask(sandbox, 1, 1, 1, ['src/a.ts']);
+  _seedTask(sandbox, 1, 1, 2, ['src/b.ts']);
+  _writeTaskSummary(sandbox, 1, 1, 1, '## Changes\n- Added src/a.ts');
+  _writeTaskSummary(sandbox, 1, 1, 2, '## Changes\n- Added src/b.ts');
+
+  const cap = _capture();
+  subcmd.run(['finalize-slice', '1', '1'], { cwd: sandbox, stdout: cap.stub });
+  const out = JSON.parse(cap.get());
+  assert.equal(out.slice, 'M001-S001');
+  assert.equal(out.task_count, 2);
+
+  const summaryPath = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices', 'S001', 'S001-SUMMARY.md');
+  assert.ok(fs.existsSync(summaryPath));
+  const body = fs.readFileSync(summaryPath, 'utf-8');
+  assert.match(body, /slice: "M001-S001"/);
+  assert.match(body, /type: slice-summary/);
+  assert.match(body, /### M001-S001-T0001/);
+  assert.match(body, /### M001-S001-T0002/);
+  assert.match(body, /Added src\/a.ts/);
+  assert.match(body, /Added src\/b.ts/);
+});
+
+test('EM-8: finalize-slice fails when slice directory does not exist', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  const cap = _capture();
+  assert.throws(
+    () => subcmd.run(['finalize-slice', '1', '9'], { cwd: sandbox, stdout: cap.stub }),
+    (err) => err && err.code === 'finalize-slice-not-found',
+  );
+});
+
+test('EM-9: finalize-milestone iterates every slice and produces one summary per slice', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  seedSliceDir(sandbox, 1, 1, {});
+  seedSliceDir(sandbox, 1, 2, {});
+  _seedTask(sandbox, 1, 1, 1, ['src/a.ts']);
+  _seedTask(sandbox, 1, 2, 1, ['src/c.ts']);
+
+  const cap = _capture();
+  subcmd.run(['finalize-milestone', '1'], { cwd: sandbox, stdout: cap.stub });
+  const out = JSON.parse(cap.get());
+  assert.equal(out.milestone, 'M001');
+  assert.equal(out.finalized.length, 2);
+  assert.equal(out.reason, 'ok');
+
+  const s1 = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices', 'S001', 'S001-SUMMARY.md');
+  const s2 = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices', 'S002', 'S002-SUMMARY.md');
+  assert.ok(fs.existsSync(s1));
+  assert.ok(fs.existsSync(s2));
+});
+
+test('EM-10: finalize-slice marks tasks without SUMMARY.md but does not fail', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _roadmap());
+  seedMilestoneDir(sandbox, 1, {});
+  seedSliceDir(sandbox, 1, 1, {});
+  _seedTask(sandbox, 1, 1, 1, ['src/a.ts']);
+  const dir = path.join(sandbox, '.nubos-pilot', 'milestones', 'M001', 'slices', 'S001', 'tasks', 'T0001');
+  fs.rmSync(path.join(dir, 'T0001-SUMMARY.md'));
+
+  const cap = _capture();
+  subcmd.run(['finalize-slice', '1', '1'], { cwd: sandbox, stdout: cap.stub });
+  const out = JSON.parse(cap.get());
+  assert.equal(out.task_count, 1);
+  const body = fs.readFileSync(out.summary_path, 'utf-8');
+  assert.match(body, /No T<NNNN>-SUMMARY.md file present/);
+});
