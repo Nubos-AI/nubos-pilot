@@ -126,11 +126,10 @@ user-facing output, and any narrative prose written into PROJECT.md /
 REQUIREMENTS.md (field names and YAML keys stay canonical English).
 Supersedes CLAUDE.md.
 
-**Text-mode routing.** If INIT payload `text_mode == true`, skip every
-`np-tools.cjs askuser` call below and render each question as a plain-text
-prompt in the main chat; collect the user's answer inline and move on.
-Auto-enabled in Claude Code (CLAUDECODE=1); opt-in via
-`.nubos-pilot/config.json` → `workflow.text_mode`.
+**Askuser routing.** Every `node .nubos-pilot/bin/np-tools.cjs askuser …` block below is a spec, not a literal command. Pick the path once at Initialize:
+- **Claude Code** (native `AskUserQuestion` tool is available): parse the JSON spec and call `AskUserQuestion` directly. `select` → `multiSelect: false`; `multiselect` → `multiSelect: true`; `confirm` → `options: [{label: "Yes"}, {label: "No"}]`; `input` → ask free-form in chat. Use a short `header` (≤12 chars).
+- **`text_mode == true`** (INIT payload): skip every askuser block and render questions as plain-text numbered lists. Opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
+- **Other runtime with TTY** (Codex, Gemini, …): execute the shell `askuser` block verbatim.
 
 ```bash
 ANS_PROJECT_NAME=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{"type":"input","prompt":"Project name?"}')

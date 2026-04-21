@@ -56,7 +56,7 @@ test('text-mode CLI: default without config and without Claude env prints "false
   }
 });
 
-test('text-mode CLI: CLAUDECODE=1 prints "true"', () => {
+test('text-mode CLI: CLAUDECODE=1 no longer prints "true" (AskUserQuestion path)', () => {
   const restore = _clearClaudeEnv();
   try {
     process.env.CLAUDECODE = '1';
@@ -65,7 +65,7 @@ test('text-mode CLI: CLAUDECODE=1 prints "true"', () => {
       const io = _captureIO();
       const rc = subcmd.run([], { cwd: dir, stdout: io.stdout, stderr: io.stderr });
       assert.equal(rc, 0);
-      assert.equal(io.stdoutText().trim(), 'true');
+      assert.equal(io.stdoutText().trim(), 'false');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -74,18 +74,21 @@ test('text-mode CLI: CLAUDECODE=1 prints "true"', () => {
   }
 });
 
-test('text-mode CLI: --json emits detail object', () => {
+test('text-mode CLI: --json emits detail object with config source', () => {
   const restore = _clearClaudeEnv();
   try {
-    process.env.CLAUDECODE = '1';
     const dir = _mkSandbox();
     try {
+      fs.writeFileSync(
+        path.join(dir, '.nubos-pilot', 'config.json'),
+        JSON.stringify({ workflow: { text_mode: true } }),
+      );
       const io = _captureIO();
       const rc = subcmd.run(['--json'], { cwd: dir, stdout: io.stdout, stderr: io.stderr });
       assert.equal(rc, 0);
       const payload = JSON.parse(io.stdoutText().trim());
       assert.equal(payload.enabled, true);
-      assert.equal(payload.source, 'runtime');
+      assert.equal(payload.source, 'config');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -94,7 +97,7 @@ test('text-mode CLI: --json emits detail object', () => {
   }
 });
 
-test('text-mode CLI: config workflow.text_mode=false wins over CLAUDECODE', () => {
+test('text-mode CLI: config workflow.text_mode=false stays false even with CLAUDECODE', () => {
   const restore = _clearClaudeEnv();
   try {
     process.env.CLAUDECODE = '1';

@@ -52,16 +52,16 @@ into `$TEXT`. Empty text after stripping is an error — there is no
 `list` or `promote` subcommand here (deferred to a future
 capture-management plan).
 
-**Text-mode routing.** Resolve once at the start:
+**Askuser routing.** Resolve once at the start:
 
 ```bash
 TEXT_MODE=$(node .nubos-pilot/bin/np-tools.cjs text-mode 2>/dev/null || echo false)
 ```
 
-If `$TEXT_MODE == "true"`, skip every `np-tools.cjs askuser` call below and
-render questions as plain-text numbered lists in the main chat. Auto-enabled
-in Claude Code (CLAUDECODE=1); opt-in via `.nubos-pilot/config.json` →
-`workflow.text_mode`.
+Every `node .nubos-pilot/bin/np-tools.cjs askuser …` block below is a spec, not a literal command. Pick the path:
+- **Claude Code** (native `AskUserQuestion` tool is available): parse the JSON spec and call `AskUserQuestion` directly. `select` → `multiSelect: false`; `multiselect` → `multiSelect: true`; `confirm` → `options: [{label: "Yes"}, {label: "No"}]`; `input` → ask free-form in chat. Use a short `header` (≤12 chars).
+- **`$TEXT_MODE == "true"`**: skip every askuser block and render questions as plain-text numbered lists. Opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
+- **Other runtime with TTY** (Codex, Gemini, …): execute the shell `askuser` block verbatim.
 
 ## Compute Paths
 

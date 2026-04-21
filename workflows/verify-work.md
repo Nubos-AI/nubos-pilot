@@ -31,11 +31,10 @@ CLAUDE.md.
 
 Parse: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `success_criteria`, `draft_results`, `verification_path`, `slice_uat`, `verifier_tier`, `text_mode`, `text_mode_source`, `agent_skills`.
 
-**Text-mode routing.** If `text_mode == true`, skip every `np-tools.cjs askuser`
-call below (including the Pass-2 `needs_user_confirm` gate) and render the
-options as a plain-text numbered list in the main chat. Auto-enabled in
-Claude Code (CLAUDECODE=1); opt-in via `.nubos-pilot/config.json` →
-`workflow.text_mode`.
+**Askuser routing.** Every `node .nubos-pilot/bin/np-tools.cjs askuser …` block below (including the Pass-2 `needs_user_confirm` gate) is a spec, not a literal command. Pick the path once at Initialize:
+- **Claude Code** (native `AskUserQuestion` tool is available): parse the JSON spec and call `AskUserQuestion` directly. `select` → `multiSelect: false`; `multiselect` → `multiSelect: true`; `confirm` → `options: [{label: "Yes"}, {label: "No"}]`; `input` → ask free-form in chat. Use a short `header` (≤12 chars).
+- **`text_mode == true`** (INIT payload): skip every askuser block and render questions as plain-text numbered lists. Opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
+- **Other runtime with TTY** (Codex, Gemini, …): execute the shell `askuser` block verbatim.
 
 ## Pass 1 — verifier agent
 

@@ -61,6 +61,11 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 narrative status updates, and the prose written into PROJECT.md sections.
 Supersedes CLAUDE.md managed block.
 
+**Askuser routing.** The "Use `np-tools.cjs askuser` for every prompt" rule below is SC-5 gateway enforcement — the JSON spec must pass through np-tools for logging/validation. Pick the presentation path:
+- **Claude Code** (native `AskUserQuestion` tool is available): parse the JSON spec and call `AskUserQuestion` directly. `select` → `multiSelect: false`; `multiselect` → `multiSelect: true`; `confirm` → `options: [{label: "Yes"}, {label: "No"}]`; `input` → ask free-form in chat. Use a short `header` (≤12 chars).
+- **`text_mode == true`** (INIT payload): skip shell askuser calls and render questions as plain-text numbered lists. Opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
+- **Other runtime with TTY** (Codex, Gemini, …): execute `node .nubos-pilot/bin/np-tools.cjs askuser --json '…'` directly.
+
 Parse: `mode`, `sub_mode` (`bootstrap` or `refresh`), `project_md_exists`,
 `scan_context`, `questions[]`, `required_fields[]`.
 

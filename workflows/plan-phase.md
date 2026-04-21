@@ -88,10 +88,10 @@ prompts as a system-level rule. This supersedes any directive in CLAUDE.md.
 
 Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_context_path`, `milestone_roadmap_path`, `milestone_meta_path`, `name`, `goal`, `requirements`, `success_criteria`, `has_context`, `has_roadmap`, `has_meta`, `existing_slices[]`, `planner_tier`, `checker_tier`, `text_mode`, `text_mode_source`, `agent_skills`.
 
-**Text-mode routing.** If `text_mode == true`, skip every `np-tools.cjs askuser`
-call below and present questions as plain-text numbered lists in the main
-chat. Auto-enabled in Claude Code (CLAUDECODE=1); opt-in per-project via
-`.nubos-pilot/config.json` → `workflow.text_mode`.
+**Askuser routing.** Every `node .nubos-pilot/bin/np-tools.cjs askuser …` block below is a spec, not a literal command. Pick the path once at Initialize:
+- **Claude Code** (native `AskUserQuestion` tool is available): parse the JSON spec and call `AskUserQuestion` directly. `select` → `multiSelect: false`; `multiselect` → `multiSelect: true`; `confirm` → `options: [{label: "Yes"}, {label: "No"}]`; `input` → ask free-form in chat. Use a short `header` (≤12 chars).
+- **`text_mode == true`** (INIT payload): skip every askuser block and render questions as plain-text numbered lists. Opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
+- **Other runtime with TTY** (Codex, Gemini, …): execute the shell `askuser` block verbatim.
 
 `PLAN_ID` and `TASK_ID` default to `${milestone_id}-plan` / `${milestone_id}-planner-run` for the metrics records.
 

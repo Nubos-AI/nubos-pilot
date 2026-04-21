@@ -34,22 +34,20 @@ Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`,
 `milestone_context_path`, `has_context`, `has_milestone_dir`, `goal`,
 `requirements`, `agent_skills`, `mode`, `text_mode`, `text_mode_source`.
 
-**Text-mode routing (SSOT = INIT payload).** If `text_mode` is `true`, do
-**not** shell out to `np-tools.cjs askuser` for any prompt in this workflow.
-Present every question inline as a plain-text numbered list and wait for the
-user's reply in the main chat. This is the correct path whenever:
+**Askuser routing (SSOT = INIT payload).** Every `node .nubos-pilot/bin/np-tools.cjs askuser …` block below is a **spec**, not a literal command. Pick the path once at Initialize:
 
-- `text_mode_source == "runtime"` → Claude Code Bash has no TTY and cannot
-  forward interactive menu selections; the askuser marker-block protocol
-  never completes.
-- `text_mode_source == "config"` → the user explicitly opted into text mode
-  via `.nubos-pilot/config.json` → `workflow.text_mode`.
+- **Claude Code runtime** (you are running inside Claude Code — the `AskUserQuestion` tool is available to you): **do not** shell out to `np-tools.cjs askuser`. Parse the JSON spec inside each askuser block and call the native `AskUserQuestion` tool directly with one question entry:
+  - `type: "select"` → `{ question, header, multiSelect: false, options: [{label, description}...] }`
+  - `type: "multiselect"` → `{ question, header, multiSelect: true, options: [{label, description}...] }`
+  - `type: "confirm"` → single question with `options: [{label: "Yes"}, {label: "No"}]`, `multiSelect: false`
+  - `type: "input"` → ask as a plain free-form question in the chat; the user replies inline
+  Use a short `header` (≤12 chars) that labels the category, e.g. `"Discuss"`, `"Scope"`, `"Overwrite?"`. This is the default path and gives the user a real selection menu.
 
-When text mode is active, skip every `node .nubos-pilot/bin/np-tools.cjs
-askuser …` block below and substitute the plain-text equivalent. Collect the
-answers from the user's reply, then proceed to the next step as normal. The
-rest of the workflow (validation, canonical-ref accumulation, template
-render, commit) is unchanged.
+- **`text_mode == true`** (INIT payload): skip every askuser block and render every question inline as a plain-text numbered list; the user replies with the number. This path is opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
+
+- **Other runtime with TTY** (Codex, Gemini, …): run the shell `node .nubos-pilot/bin/np-tools.cjs askuser --json '…'` block verbatim.
+
+`text_mode_source` in the INIT payload (`config` / `default`) is informational only — it does not change the routing above.
 
 If the user passed `--assumptions`, route to
 `workflows/discuss-phase-assumptions.md` and exit this workflow.
@@ -142,33 +140,19 @@ Capture the idea in a "Deferred Ideas" section. Don't lose it, don't act on it.
 ## Answer Validation
 
 <answer_validation>
-**Routing decision (made once at Initialize):** If INIT payload
-`text_mode == true`, skip every `np-tools.cjs askuser` call in this workflow
-and use plain-text numbered lists in the main chat instead. The
-`text_mode_source` field (`runtime` / `config` / `default`) tells you why
-text mode is active — it is informational only and does not change behavior.
+**Routing was decided at Initialize** (see "Askuser routing" section above). This section documents per-prompt validation only.
 
-**When text_mode is false and askuser is used — per-prompt validation:**
-1. If `askuser` exits with structured error `askuser-no-tty` (exit code 1,
-   stderr JSON with `"code":"askuser-no-tty"`), that means the runtime
-   detection missed something; **skip retry** and treat the remainder of the
-   workflow as text-mode (plain-text numbered lists).
-2. If the response is empty or whitespace-only (exit 0 but no value), retry
-   the question once with the same parameters.
-3. If still empty, present the options as a plain-text numbered list and ask
-   the user to type their choice number.
+**Claude Code path (`AskUserQuestion` tool):** the tool guarantees a non-empty selection; no validation needed.
+
+**Shell askuser path (other runtimes with TTY):**
+1. If `askuser` exits with structured error `askuser-no-tty` (exit code 1, stderr JSON with `"code":"askuser-no-tty"`), that means the runtime detection missed something; **skip retry** and treat the remainder of the workflow as text-mode (plain-text numbered lists).
+2. If the response is empty or whitespace-only (exit 0 but no value), retry the question once with the same parameters.
+3. If still empty, present the options as a plain-text numbered list and ask the user to type their choice number.
 Never proceed with an empty answer.
 
-**Enable text mode:**
-- Auto-detected: any Claude Code session (`CLAUDECODE=1` /
-  `CLAUDE_CODE_ENTRYPOINT` set) — default behavior, no user action needed.
-- Opt-in per project: set `workflow.text_mode: true` in
-  `.nubos-pilot/config.json`.
-- Opt-out per project: set `workflow.text_mode: false` in
-  `.nubos-pilot/config.json` (overrides runtime detection).
+**Text-mode (numbered-list path):** user reply must parse as a valid index (1-N) for select/multiselect, `y/n` for confirm, or any non-empty string for input. Re-ask on invalid input.
 
-Text mode applies to ALL workflows that emit `text_mode` in their INIT
-payload, not just discuss-phase.
+**Enable text mode** (force the numbered-list path regardless of runtime): set `workflow.text_mode: true` in `.nubos-pilot/config.json`. Useful for remote-control setups or runtimes where neither `AskUserQuestion` nor TTY stdin are reliable.
 </answer_validation>
 
 ## Process

@@ -83,7 +83,7 @@ test('DP-1: run(["3"]) on valid milestone returns JSON payload with expected sha
   }
 });
 
-test('DP-1b: CLAUDECODE=1 sets text_mode=true with runtime source', () => {
+test('DP-1b: CLAUDECODE=1 no longer flips text_mode (Claude Code uses AskUserQuestion)', () => {
   const restore = _clearClaudeEnv();
   try {
     process.env.CLAUDECODE = '1';
@@ -92,8 +92,8 @@ test('DP-1b: CLAUDECODE=1 sets text_mode=true with runtime source', () => {
     const cap = _captureStdout();
     subcmd.run(['3'], { cwd: sandbox, stdout: cap.stub });
     const payload = JSON.parse(cap.get().trim());
-    assert.equal(payload.text_mode, true);
-    assert.equal(payload.text_mode_source, 'runtime');
+    assert.equal(payload.text_mode, false);
+    assert.equal(payload.text_mode_source, 'default');
   } finally {
     restore();
   }

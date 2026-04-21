@@ -683,6 +683,10 @@ async function main() {
       const doctor = require('./np-tools/doctor.cjs');
       return await doctor.run(rest.slice(1), { cwd, stdout: process.stdout });
     }
+    case 'install-hooks':
+      return await runInstallHooks({ cwd, args: rest.slice(1) });
+    case 'uninstall-hooks':
+      return await runUninstallHooks({ cwd, args: rest.slice(1) });
     default:
       process.stderr.write(
         red + 'Unbekanntes Subcommand: ' + sub + reset + '\n',
@@ -690,6 +694,70 @@ async function main() {
       process.exit(1);
       return undefined;
   }
+}
+
+function _parseHookFlags(args) {
+  const flags = { scope: null, which: 'both', force: false, dryRun: false };
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === '--scope' || a === '-s') { flags.scope = args[++i] || null; continue; }
+    if (a.startsWith('--scope=')) { flags.scope = a.slice('--scope='.length); continue; }
+    if (a === '--statusline-only') { flags.which = 'statusline'; continue; }
+    if (a === '--ctx-monitor-only') { flags.which = 'ctx-monitor'; continue; }
+    if (a === '--force' || a === '-f') { flags.force = true; continue; }
+    if (a === '--dry-run') { flags.dryRun = true; continue; }
+  }
+  if (flags.scope && !VALID_SCOPES.includes(flags.scope)) {
+    throw new NubosPilotError('invalid-flag',
+      '--scope must be one of: ' + VALID_SCOPES.join(', '),
+      { flag: '--scope', got: flags.scope });
+  }
+  return flags;
+}
+
+async function runInstallHooks(opts) {
+  const o = opts || {};
+  const projectRoot = o.projectRoot || o.cwd || process.cwd();
+  const flags = _parseHookFlags(o.args || []);
+  const scope = flags.scope || _readExistingScope(projectRoot) || 'local';
+  const claudeHooks = require('../lib/install/claude-hooks.cjs');
+  const res = claudeHooks.installClaudeHooks({
+    projectRoot, scope, which: flags.which, force: flags.force, dryRun: flags.dryRun,
+  });
+  if (res.dryRun) {
+    process.stdout.write(JSON.stringify({ dryRun: true, path: res.path, results: res.results }, null, 2) + '\n');
+    return res;
+  }
+  console.error(green + '✓ Claude Code hooks geschrieben → ' + res.path + reset);
+  if (res.results.statusline) {
+    console.error(dim + '  statusline: ' + res.results.statusline.action
+      + (res.results.statusline.existingCommand ? ' (existing: ' + res.results.statusline.existingCommand + ')' : '')
+      + reset);
+  }
+  if (res.results.ctxMonitor) {
+    console.error(dim + '  ctx-monitor: ' + res.results.ctxMonitor.action + reset);
+  }
+  if (res.results.statusline && res.results.statusline.action === 'skipped-existing') {
+    console.error(yellow + '  [statusline] existing non-nubos statusLine preserved. Pass --force to overwrite.' + reset);
+  }
+  return res;
+}
+
+async function runUninstallHooks(opts) {
+  const o = opts || {};
+  const projectRoot = o.projectRoot || o.cwd || process.cwd();
+  const flags = _parseHookFlags(o.args || []);
+  const scope = flags.scope || _readExistingScope(projectRoot) || 'local';
+  const claudeHooks = require('../lib/install/claude-hooks.cjs');
+  const res = claudeHooks.uninstallClaudeHooks({ projectRoot, scope, dryRun: flags.dryRun });
+  if (res.dryRun) {
+    process.stdout.write(JSON.stringify({ dryRun: true, path: res.path, results: res.results }, null, 2) + '\n');
+    return res;
+  }
+  console.error(green + '✓ Claude Code hooks entfernt ← ' + res.path + reset);
+  console.error(dim + '  statusline: ' + res.results.statusline.action + reset);
+  console.error(dim + '  ctx-monitor: ' + res.results.ctxMonitor.action + reset);
+  return res;
 }
 
 if (require.main === module) {
