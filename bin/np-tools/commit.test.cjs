@@ -57,12 +57,39 @@ test('COMMIT-1: happy path commits a single file and prints sha JSON', () => {
   assert.match(stdout.toString(), /"committed":\s*true/);
 });
 
-test('COMMIT-2: path with ".." segment rejected with commit-path-traversal', () => {
+test('COMMIT-2: path resolving outside project root rejected with commit-path-outside-project', () => {
+  const sb = makeSandbox();
+  initGit(sb);
   const stdout = makeSink();
   const stderr = makeSink();
-  const code = commitCli.run(['feat: x', '--files', '../outside.txt'], { stdout, stderr });
+  const code = commitCli.run(['feat: x', '--files', '../outside.txt'], { cwd: sb, stdout, stderr });
   assert.equal(code, 1);
-  assert.match(stderr.toString(), /"code":\s*"commit-path-traversal"/);
+  assert.match(stderr.toString(), /"code":\s*"commit-path-outside-project"/);
+});
+
+test('COMMIT-2b: absolute path inside project root is accepted and normalized', () => {
+  const sb = makeSandbox();
+  initGit(sb);
+  const absFile = path.join(sb, 'note.md');
+  fs.writeFileSync(absFile, 'hi\n');
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = commitCli.run(['docs: note', '--files', absFile], { cwd: sb, stdout, stderr });
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  assert.match(stdout.toString(), /"committed":\s*true/);
+});
+
+test('COMMIT-2c: absolute path outside project root rejected', () => {
+  const sb = makeSandbox();
+  initGit(sb);
+  const outside = path.join(os.tmpdir(), 'np-commit-outside-' + Date.now() + '.txt');
+  fs.writeFileSync(outside, 'x');
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = commitCli.run(['docs: x', '--files', outside], { cwd: sb, stdout, stderr });
+  try { fs.unlinkSync(outside); } catch {}
+  assert.equal(code, 1);
+  assert.match(stderr.toString(), /"code":\s*"commit-path-outside-project"/);
 });
 
 test('COMMIT-3: empty message prints usage and exits 1', () => {

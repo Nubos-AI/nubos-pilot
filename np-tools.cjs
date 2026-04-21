@@ -48,6 +48,7 @@ const topLevelCommands = {
   'lang-directive': require('./bin/np-tools/lang-directive.cjs'),
   'text-mode':      require('./bin/np-tools/text-mode.cjs'),
   'detect-runtime': require('./bin/np-tools/detect-runtime.cjs'),
+  'template-path':  require('./bin/np-tools/template-path.cjs'),
 };
 
 const THRESHOLD = 16 * 1024;

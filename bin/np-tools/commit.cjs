@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
-const { NubosPilotError } = require('../../lib/core.cjs');
+const { NubosPilotError, findProjectRoot } = require('../../lib/core.cjs');
 const { assertCommittablePaths } = require('../../lib/git.cjs');
 const { resolveCommitArtifacts } = require('../../lib/commit-policy.cjs');
 
@@ -47,19 +48,34 @@ function _parseArgs(argv) {
   return { msg, files };
 }
 
+function _realpathOrResolve(p) {
+  try { return fs.realpathSync(p); } catch { return path.resolve(p); }
+}
+
+function _normalizeFiles(files, cwd, root) {
+  const realRoot = _realpathOrResolve(root);
+  return files.map((f) => {
+    if (typeof f !== 'string' || f.length === 0) {
+      throw new NubosPilotError('commit-invalid-path', 'commit path must be non-empty string', { path: f });
+    }
+    const abs = path.isAbsolute(f) ? path.resolve(f) : path.resolve(cwd, f);
+    const realAbs = _realpathOrResolve(abs);
+    const rel = path.relative(realRoot, realAbs);
+    if (rel === '' || rel.startsWith('..') || path.isAbsolute(rel)) {
+      throw new NubosPilotError(
+        'commit-path-outside-project',
+        'commit path must resolve inside project root',
+        { path: f, root },
+      );
+    }
+    return rel;
+  });
+}
+
 function _validateFiles(files) {
   for (const f of files) {
     if (typeof f !== 'string' || f.length === 0) {
       throw new NubosPilotError('commit-invalid-path', 'commit path must be non-empty string', { path: f });
-    }
-    const segments = String(f).split(/[/\\]/);
-    for (const seg of segments) {
-      if (seg === '..') {
-        throw new NubosPilotError('commit-path-traversal', 'commit path must not contain ".." segments', { path: f });
-      }
-    }
-    if (path.isAbsolute(f)) {
-      throw new NubosPilotError('commit-path-absolute', 'commit path must be relative', { path: f });
     }
   }
 }
@@ -87,13 +103,15 @@ function run(argv, ctx) {
       stdout.write(JSON.stringify({ committed: false, reason: 'commit_artifacts=false', files }) + '\n');
       return 0;
     }
-    const committable = assertCommittablePaths(files);
+    const root = findProjectRoot(cwd);
+    const normalized = _normalizeFiles(files, cwd, root);
+    const committable = assertCommittablePaths(normalized, { cwd: root });
     if (committable.length === 0) {
       throw new NubosPilotError('commit-no-paths', 'commit invoked with no committable paths', { files });
     }
-    execFileSync('git', ['add', '--', ...committable], { stdio: 'pipe' });
-    execFileSync('git', ['commit', '-m', msg, '--', ...committable], { stdio: 'pipe' });
-    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf-8' }).trim();
+    execFileSync('git', ['add', '--', ...committable], { cwd: root, stdio: 'pipe' });
+    execFileSync('git', ['commit', '-m', msg, '--', ...committable], { cwd: root, stdio: 'pipe' });
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf-8' }).trim();
     stdout.write(JSON.stringify({ committed: true, sha, files: committable }) + '\n');
     return 0;
   } catch (err) {

@@ -42,7 +42,7 @@ the main chat. Auto-enabled in Claude Code (CLAUDECODE=1); opt-in via
 MILESTONE_ID=$(echo "$INIT" | jq -r '.milestone_id')
 MILESTONE_DIR=$(echo "$INIT" | jq -r '.milestone_dir')
 VALIDATION_PATH="${MILESTONE_DIR}/${MILESTONE_ID}-VALIDATION.md"
-TEMPLATE_PATH="templates/VALIDATION.md"
+TEMPLATE_PATH=$(node .nubos-pilot/bin/np-tools.cjs template-path VALIDATION)
 REQS_PATH=".nubos-pilot/REQUIREMENTS.md"
 PLAN_ID="${MILESTONE_ID}-validate"
 TASK_ID="${MILESTONE_ID}-validate"
@@ -93,9 +93,9 @@ fi
 ### Gate 3 — Template present
 
 ```bash
-if [[ ! -f "$TEMPLATE_PATH" ]]; then
-  echo "Error: $TEMPLATE_PATH missing." >&2
-  echo "Re-run 'npx nubos-pilot install' or restore templates/VALIDATION.md from source." >&2
+if [[ -z "$TEMPLATE_PATH" || ! -f "$TEMPLATE_PATH" ]]; then
+  echo "Error: VALIDATION template not resolvable via np-tools.cjs template-path." >&2
+  echo "Re-run 'npx nubos-pilot install' or check the package's templates/ dir." >&2
   exit 1
 fi
 ```

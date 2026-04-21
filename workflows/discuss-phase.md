@@ -356,13 +356,14 @@ CONTEXT_PATH=$(echo "$INIT" | node -e 'let d="";process.stdin.on("data",c=>d+=c)
 mkdir -p "$MILESTONE_DIR"
 mkdir -p "$MILESTONE_DIR/slices"
 
+TPL_PATH=$(node .nubos-pilot/bin/np-tools.cjs template-path milestone/CONTEXT)
 node -e '
   const { render } = require("./lib/template.cjs");
   const fs = require("node:fs");
-  const tpl = fs.readFileSync("templates/milestone/CONTEXT.md", "utf-8");
-  const vars = JSON.parse(process.argv[1]);
+  const tpl = fs.readFileSync(process.argv[1], "utf-8");
+  const vars = JSON.parse(process.argv[2]);
   process.stdout.write(render(tpl, vars));
-' "$VARS_JSON" > "$CONTEXT_PATH"
+' "$TPL_PATH" "$VARS_JSON" > "$CONTEXT_PATH"
 ```
 
 `$VARS_JSON` is the JSON-serialised accumulator from Steps 2–5 (keys map to
