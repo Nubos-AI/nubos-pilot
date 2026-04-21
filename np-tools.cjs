@@ -12,6 +12,7 @@ const initWorkflows = {
   'new-project':         require('./bin/np-tools/new-project.cjs'),
   'discuss-project':     require('./bin/np-tools/discuss-project.cjs'),
   'new-milestone':       require('./bin/np-tools/new-milestone.cjs'),
+  'propose-milestones':  require('./bin/np-tools/propose-milestones.cjs'),
 
   'execute-milestone':   require('./bin/np-tools/execute-milestone.cjs'),
   'verify-work':         require('./bin/np-tools/verify-work.cjs'),

@@ -9,6 +9,7 @@ const COMMANDS = [
   { name: 'plan-milestone',      category: 'Planning', description: 'Plan a milestone: scaffolds slices + tasks' },
   { name: 'new-project',         category: 'Planning', description: 'Greenfield project init (PROJECT.md + REQUIREMENTS.md + M001 milestone)' },
   { name: 'new-milestone',       category: 'Planning', description: 'Append a new milestone (M<NNN>) to an existing project' },
+  { name: 'propose-milestones',  category: 'Planning', description: 'Re-plan all not-yet-done milestones: AI proposes add/update/remove from PROJECT.md + REQUIREMENTS.md' },
   { name: 'agent-skills',        category: 'Planning', description: 'Print agent_skills config for a given subagent' },
 
   { name: 'execute-milestone',   category: 'Execution', description: 'Wave-based milestone execution — slice by slice, tasks parallel within a slice' },

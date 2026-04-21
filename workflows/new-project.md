@@ -6,11 +6,12 @@ argument-hint: [--apply <answers.json>]
 
 # np:new-project
 
-Initialize a new nubos-pilot project in three phases:
+Initialize a new nubos-pilot project in four phases:
 
 1. **Phase 0 — Workspace Scan** (context capture)
-2. **Phase 1 — Bootstrap Interview** (5 structural questions → scaffold)
+2. **Phase 1 — Bootstrap Interview** (5 structural questions → scaffold with M001)
 3. **Phase 2 — Project Discovery** (obligatory, chains into `np:discuss-project --bootstrap`)
+4. **Phase 3 — Additional Milestones** (AI proposes from Discovery, user reviews; appends M002, M003, …)
 
 Optionally runs an initial codebase scan at the end when the workspace
 contains existing source (`np:scan-codebase`). Everything lands under
@@ -55,9 +56,17 @@ This workflow writes:
 - `.nubos-pilot/roadmap.yaml` (schema_version: 2, first milestone M001 with empty slices[])
 - `.nubos-pilot/STATE.md`
 - `.nubos-pilot/milestones/M001/{M001-CONTEXT.md, M001-ROADMAP.md, M001-META.json}`
+- (optional) `.nubos-pilot/milestones/M002/ …` via Phase 3 AI-proposed
+  review (or the manual bulk-loop fallback)
 - (optional) `.nubos-pilot/codebase/` via chained `np:scan-codebase`
 
 `np:discuss-project` (Phase 2) chains automatically — not skippable.
+Phase 3 reads populated PROJECT.md + REQUIREMENTS.md, proposes a
+milestone sequence, and lets the user accept / edit / discard before any
+write. Each accepted milestone is delegated to the `new-milestone`
+subcommand, which auto-numbers M<NNN> and honors the D-29 invariant
+(PROJECT.md is never rewritten). Phase 3 skips cleanly when PROJECT.md
+still has `_TBD` placeholders.
 `np:scan-codebase` chains when the workspace contains >= 1 source file.
 </downstream_awareness>
 
@@ -215,7 +224,205 @@ finish later)
 
 Record the skip in STATE.md so the next `np:next` reminds the user.
 
-## Phase 3 (conditional): Initial Codebase Scan
+## Phase 3: Additional Milestones (AI-proposed, user-reviewed)
+
+After Discovery, PROJECT.md and REQUIREMENTS.md are populated — this is
+the richest context the workflow will ever have about the project. Use it:
+the AI proposes a milestone sequence (M002, M003, …) derived from
+Discovery, the user reviews, and accepted milestones are appended via the
+`new-milestone --apply` subcommand. Each appended milestone starts empty
+(`slices: []`) and is discussed/planned later via `/np:discuss-phase <N>`
+and `/np:plan-phase <N>`.
+
+### Step 3.1 — Skip guard
+
+Phase 3 depends on populated Discovery content. If PROJECT.md still
+contains `_TBD — filled by /np:discuss-project._` placeholders, skip
+Phase 3 with a clear hint:
+
+```bash
+PROJECT_MD=".nubos-pilot/PROJECT.md"
+if grep -q "_TBD — filled by /np:discuss-project._" "$PROJECT_MD"; then
+  echo "Phase 3 skipped — PROJECT.md has unfilled sections. Finish /np:discuss-project, then append milestones via /np:new-milestone."
+  MILESTONES_APPENDED=()
+else
+  # Step 3.2 onward …
+fi
+```
+
+### Step 3.2 — Propose milestone sequence
+
+Read `.nubos-pilot/PROJECT.md` and `.nubos-pilot/REQUIREMENTS.md` in full.
+Derive a proposed milestone breakdown grounded in Discovery:
+
+- **Anchor on Success Criteria** — each major success criterion maps to
+  at least one milestone.
+- **Respect Non-Goals** — never propose a milestone that crosses a
+  declared Non-Goal.
+- **Honor Strategic Decisions** — reflected in ordering / `depends_on`
+  (e.g. "infra before features" → infra milestone first).
+- **Target 3–6 milestones.** Pick a count that matches project scope;
+  don't pad, don't hand-wave. A tiny project can legitimately have 0
+  additional milestones (M001 is enough); say so explicitly in that case.
+- **One clear goal per milestone**, one sentence, shippable as a unit.
+
+Render the proposal in the main chat (NOT via askuser) so the user sees
+the full list at once:
+
+```
+Based on PROJECT.md + REQUIREMENTS.md I propose these milestones
+in addition to M001 — <first_milestone_name>:
+
+  [1] <name> — <goal>
+  [2] <name> — <goal>
+  [3] <name> — <goal>
+  …
+
+Reasoning:
+  - <name 1>: anchored in success criterion "<excerpt>"
+  - <name 2>: …
+```
+
+If the AI concludes no further milestones are warranted, state that
+explicitly and skip to Step 3.5 with an empty acceptance list.
+
+### Step 3.3 — User review
+
+```bash
+REVIEW_CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
+  "type": "select",
+  "prompt": "How do you want to proceed with the proposed milestones?",
+  "options": [
+    "Accept all as proposed",
+    "Edit individually (accept/edit/remove per item)",
+    "Discard proposal and enter my own list",
+    "Keep only M001"
+  ]
+}')
+```
+
+Routing:
+
+- **Accept all** → `ACCEPTED` = full proposal, unchanged.
+- **Edit individually** → iterate over proposals; for each ask
+  `select` with options `Accept`, `Edit name/goal`, `Remove`. On `Edit`,
+  two follow-up `input` prompts collect the revised name and goal
+  (pre-filled via `prompt` default with the proposed value).
+- **Discard proposal** → fall through to the legacy bulk-loop (Step 3.4b)
+  exactly as it existed before Phase-3-AI.
+- **Keep only M001** → `ACCEPTED` = empty, skip to Step 3.5.
+
+After any of the first three paths, offer the bulk-loop as an optional
+top-up:
+
+```bash
+ADD_MORE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
+  "type": "confirm",
+  "prompt": "Add further milestones manually beyond the reviewed list?",
+  "default": false
+}')
+```
+
+### Step 3.4a — Apply accepted proposals
+
+For each entry in `ACCEPTED` (AI-proposed + any user-revised), call
+`new-milestone --apply` with a tmp answers file. Identical contract to
+`/np:new-milestone`:
+
+```bash
+MILESTONES_APPENDED=()
+for idx in "${!ACCEPTED_NAMES[@]}"; do
+  MS_ANSWERS=$(mktemp -t np-new-project-ms.XXXXXX)
+  node -e '
+    const fs = require("fs");
+    fs.writeFileSync(process.env.MS_ANSWERS, JSON.stringify({
+      milestone_name: process.env.MS_NAME,
+      milestone_goal: process.env.MS_GOAL,
+      create_req_prefix: false,
+    }));
+  ' MS_ANSWERS="$MS_ANSWERS" \
+    MS_NAME="${ACCEPTED_NAMES[$idx]}" \
+    MS_GOAL="${ACCEPTED_GOALS[$idx]}"
+
+  MS_RESULT=$(node .nubos-pilot/bin/np-tools.cjs init new-milestone --apply "$MS_ANSWERS")
+  rm -f "$MS_ANSWERS"
+
+  MS_ID=$(node -e '
+    const r = JSON.parse(process.env.MS_RESULT);
+    process.stdout.write(r.milestone_id);
+  ' MS_RESULT="$MS_RESULT")
+  MILESTONES_APPENDED+=("$MS_ID — ${ACCEPTED_NAMES[$idx]}")
+done
+```
+
+`create_req_prefix` defaults to `false` for AI-proposed milestones —
+Discovery already produced REQUIREMENTS.md sections. If the user wants a
+dedicated REQ block for a specific milestone, `/np:new-milestone` can
+add it later.
+
+### Step 3.4b — Manual bulk-loop (fallback / top-up)
+
+Entered from "Discard proposal" or from the `ADD_MORE=true` top-up gate.
+Same behavior as the pre-AI bulk-loop: prompt for `milestone_name`,
+`milestone_goal`, `create_req_prefix`; empty name exits.
+
+```bash
+while :; do
+  ANS_MS_NAME=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
+    "type": "input",
+    "prompt": "Define another milestone now? Enter name or leave empty to finish."
+  }')
+  [ -z "$ANS_MS_NAME" ] && break
+
+  ANS_MS_GOAL=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
+    "type": "input",
+    "prompt": "Milestone goal (one sentence)?"
+  }')
+  ANS_REQ_PREFIX=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
+    "type": "confirm",
+    "prompt": "Create a new Requirements section for this milestone?",
+    "default": false
+  }')
+
+  MS_ANSWERS=$(mktemp -t np-new-project-ms.XXXXXX)
+  node -e '
+    const fs = require("fs");
+    const prefix = process.env.ANS_REQ_PREFIX;
+    fs.writeFileSync(process.env.MS_ANSWERS, JSON.stringify({
+      milestone_name: process.env.ANS_MS_NAME,
+      milestone_goal: process.env.ANS_MS_GOAL,
+      create_req_prefix: prefix === "true" || prefix === "yes" || prefix === "y",
+    }));
+  ' ANS_MS_NAME="$ANS_MS_NAME" ANS_MS_GOAL="$ANS_MS_GOAL" \
+    ANS_REQ_PREFIX="$ANS_REQ_PREFIX" MS_ANSWERS="$MS_ANSWERS"
+
+  MS_RESULT=$(node .nubos-pilot/bin/np-tools.cjs init new-milestone --apply "$MS_ANSWERS")
+  rm -f "$MS_ANSWERS"
+
+  MS_ID=$(node -e '
+    const r = JSON.parse(process.env.MS_RESULT);
+    process.stdout.write(r.milestone_id);
+  ' MS_RESULT="$MS_RESULT")
+  MILESTONES_APPENDED+=("$MS_ID — $ANS_MS_NAME")
+done
+```
+
+### Step 3.5 — Done
+
+Continue to Phase 4 with `MILESTONES_APPENDED` populated (possibly empty).
+
+Notes:
+- Every write goes through `np-tools.cjs init new-milestone --apply` —
+  identical error surface (`answers-missing-field`, `roadmap-parse-error`).
+  Any failure aborts the current loop and surfaces the error; prior
+  milestones stay intact (atomic per-milestone).
+- Text-mode routing (`INIT.text_mode == true`) applies to every askuser
+  call above — render each prompt inline instead of shelling out.
+- AI-proposed milestones start empty (`slices: []`). The user discusses
+  each later via `/np:discuss-phase <N>` and plans via
+  `/np:plan-phase <N>`; PROJECT.md is never rewritten (D-29).
+
+## Phase 4 (conditional): Initial Codebase Scan
 
 If Phase 0 reported `file_count > 0` with code files (not only manifests
 and docs), offer to run the initial scan now:
@@ -258,13 +465,18 @@ Created:
     M001-ROADMAP.md
     M001-META.json
     slices/
+  .nubos-pilot/milestones/M002/ …     (if additional milestones added)
   .nubos-pilot/codebase/               (if initial scan ran)
 
-Milestone: M001 — <milestone_name>
+Milestones:
+  M001 — <milestone_name>
+  <each entry from MILESTONES_APPENDED>
 
 Next:
   - /np:discuss-phase 1 to capture decisions for M001
   - /np:plan-phase 1 to break M001 into slices + tasks
+  - /np:discuss-phase <N> / /np:plan-phase <N> for each appended milestone
+    (only after M001 ships; earlier milestones first)
   - /np:update-docs after any code change (agents will do this automatically)
 ```
 
