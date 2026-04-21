@@ -17,6 +17,7 @@ const backupMod = require('../lib/install/backup.cjs');
 const registryMod = require('../lib/install/runtimes-registry.cjs');
 const runtimeAssetsMod = require('../lib/install/runtime-assets.cjs');
 const languageMod = require('../lib/language.cjs');
+const configDefaults = require('../lib/config-defaults.cjs');
 
 const cyan = '\x1b[36m', green = '\x1b[32m', yellow = '\x1b[33m',
       red = '\x1b[31m', blue = '\x1b[38;5;33m',
@@ -248,16 +249,11 @@ async function _runInitQuestions(detectedRuntime, askUser, flags) {
   const model_profile = (await askUser({ type: 'select', question: 'Model-Profile?',
     options: ['frontier', 'quality', 'balanced', 'budget', 'inherit'], default: 'frontier' })).value;
   const response_language = (await askUser({ type: 'input', question: 'Response language (ISO-639 code)?', default: 'en' })).value;
-  return {
+  return configDefaults.buildInstallConfig({
     runtime, runtimes, scope, mcp: !!f.mcp,
     model_profile,
     response_language,
-    commit_docs: true,
-    parallelization: true,
-    research: true,
-    plan_checker: true,
-    verifier: true,
-  };
+  });
 }
 
 function _repairCodexConfig() {

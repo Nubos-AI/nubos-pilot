@@ -33,22 +33,66 @@ test('install-init: full init flow writes .nubos-pilot/config.json with all cano
   assert.ok(fs.existsSync(configPath), '.nubos-pilot/config.json must be written');
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
 
-  const expected = [
-    'runtime',
-    'model_profile',
-    'commit_docs',
-    'parallelization',
-    'research',
-    'plan_checker',
-    'verifier',
-    'response_language',
-  ];
-  for (const key of expected) {
-    assert.ok(key in config, 'config.json must contain key: ' + key);
+  const topLevel = ['runtime', 'runtimes', 'scope', 'mcp', 'model_profile', 'response_language'];
+  for (const key of topLevel) {
+    assert.ok(key in config, 'config.json must contain top-level key: ' + key);
+  }
+  assert.equal(typeof config.workflow, 'object', 'config.workflow must be a nested object');
+  for (const key of ['commit_docs', 'commit_artifacts']) {
+    assert.ok(key in config.workflow, 'config.workflow must contain nested key: ' + key);
+    assert.equal(typeof config.workflow[key], 'boolean', 'config.workflow.' + key + ' must be boolean');
+  }
+  assert.equal(typeof config.agents, 'object', 'config.agents must be a nested object');
+  for (const key of ['parallelization', 'research', 'plan_checker', 'verifier']) {
+    assert.ok(key in config.agents, 'config.agents must contain nested key: ' + key);
+  }
+  for (const stale of ['commit_docs', 'parallelization', 'research', 'plan_checker', 'verifier']) {
+    assert.ok(!(stale in config), 'config.json must NOT contain top-level key (moved to nested): ' + stale);
   }
   for (const removed of ['branching_strategy', 'phase_branch_template', 'milestone_branch_template']) {
     assert.ok(!(removed in config), 'config.json must NOT contain dead key: ' + removed);
   }
+});
+
+test('install-init: installer-written shape matches every workflow.* key that any workflow or lib reads (drift guard)', async (t) => {
+  const install = require('../../bin/install.js');
+  const root = mkTmp('init-drift');
+  t.after(() => { try { fs.rmSync(root, { recursive: true, force: true }); } catch {} });
+
+  await install.runInstall({
+    cwd: root,
+    mode: 'init',
+    askUser: async (spec) => ({
+      value: spec && spec.default !== undefined ? spec.default : 'claude',
+      source: 'test',
+    }),
+  });
+
+  const config = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'config.json'), 'utf-8'));
+
+  const repoRoot = path.resolve(__dirname, '..', '..');
+  const readKeys = new Set();
+  const CONFIG_GET_RE = /config-get\s+workflow\.([a-z_]+)/g;
+  function scan(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) { scan(p); continue; }
+      if (!/\.(md|cjs|js)$/.test(entry.name)) continue;
+      if (entry.name.endsWith('.test.cjs')) continue;
+      const body = fs.readFileSync(p, 'utf-8');
+      let m;
+      while ((m = CONFIG_GET_RE.exec(body)) !== null) readKeys.add(m[1]);
+    }
+  }
+  for (const sub of ['workflows', 'lib', 'bin']) scan(path.join(repoRoot, sub));
+
+  const missing = [];
+  for (const key of readKeys) {
+    if (!(key in (config.workflow || {}))) missing.push(key);
+  }
+  assert.deepEqual(missing, [],
+    'Every workflow.<key> referenced in code must be present in installer-written config.workflow (drift guard)');
 });
 
 test('install-p8-02: writes .opencode/nubos-pilot/ payload tree and merges manifest (RUN-02, 8.1 D-02)', async (t) => {

@@ -103,8 +103,9 @@ test('install-flags: --yes asks zero questions and uses all defaults', async (t)
   assert.equal(asked, 0, '--yes must short-circuit all askUser calls');
   const cfg = JSON.parse(fs.readFileSync(path.join(root, '.nubos-pilot', 'config.json'), 'utf-8'));
   assert.equal(cfg.model_profile, 'frontier');
-  assert.equal(cfg.commit_docs, true);
-  assert.equal(cfg.parallelization, true);
+  assert.equal(cfg.workflow.commit_docs, true);
+  assert.equal(cfg.workflow.commit_artifacts, true);
+  assert.equal(cfg.agents.parallelization, true);
   assert.equal(cfg.response_language, 'en');
   assert.ok(!('branching_strategy' in cfg), 'branching_strategy must be removed');
 });
