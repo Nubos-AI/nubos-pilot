@@ -74,7 +74,7 @@ sidesteps that resolver and hardcodes `HOME + /.nubos-pilot/notes`.
 if [[ "$SCOPE" == "global" ]]; then
   NOTES_DIR="$HOME/.nubos-pilot/notes"
 else
-  NOTES_DIR=$(node -e "console.log(require('./lib/core.cjs').projectStateDir(process.cwd()) + '/notes')")
+  NOTES_DIR=$(node .nubos-pilot/bin/np-tools.cjs state-dir --subdir notes)
 fi
 mkdir -p "$NOTES_DIR"
 DATE=$(date +%Y-%m-%d)

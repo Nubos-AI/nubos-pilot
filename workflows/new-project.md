@@ -75,20 +75,7 @@ still has `_TBD` placeholders.
 Probe the workspace for context before asking anything:
 
 ```bash
-SCAN=$(node -e '
-  const { scan } = require("./lib/workspace-scan.cjs");
-  const r = scan({ cwd: process.cwd(), batchSize: 1000 });
-  process.stdout.write(JSON.stringify({
-    file_count: r.stats.file_count,
-    langs: r.language_distribution,
-    manifests: Object.keys(r.manifests),
-    docs: Object.keys(r.docs),
-    readme_head: r.docs["README.md"]
-      ? r.docs["README.md"].content.split("\\n").slice(0, 20).join("\\n")
-      : null,
-    git: r.git,
-  }));
-')
+SCAN=$(node .nubos-pilot/bin/np-tools.cjs workspace-scan --summary --batch-size 1000)
 ```
 
 Show findings to the user and offer pre-filled suggestions:

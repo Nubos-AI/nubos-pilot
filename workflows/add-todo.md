@@ -131,7 +131,7 @@ reads of the project state directory from this workflow would bypass
 the lock and are explicitly forbidden by the check-workflows lint.
 
 ```bash
-node -e "require('./lib/state.cjs').mutateState(function (doc) { doc.frontmatter.pending_todos = (doc.frontmatter.pending_todos || 0) + 1; return doc; });"
+node .nubos-pilot/bin/np-tools.cjs state-incr pending_todos > /dev/null
 ```
 
 The mutator increments the `pending_todos` counter on the STATE.md

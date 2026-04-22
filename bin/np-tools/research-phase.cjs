@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const { NubosPilotError, projectStateDir } = require('../../lib/core.cjs');
 const layout = require('../../lib/layout.cjs');
 const textMode = require('../../lib/text-mode.cjs');
+const { DEFAULT_RESEARCH_TOOLS } = require('../../lib/config-defaults.cjs');
 
 const INLINE_THRESHOLD_BYTES = 16 * 1024;
 
@@ -46,10 +47,31 @@ function _readMilestoneDef(cwd, mNum) {
   }
 }
 
-function _toolsAvailable() {
+function _readConfigResearchTools(cwd) {
+  try {
+    const configPath = path.join(projectStateDir(cwd), 'config.json');
+    if (!fs.existsSync(configPath)) return {};
+    const parsed = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const wf = parsed && parsed.workflow;
+    const rt = wf && wf.research_tools;
+    return rt && typeof rt === 'object' ? rt : {};
+  } catch (_err) {
+    return {};
+  }
+}
+
+function _resolveToolFlag(envValue, configValue, defaultValue) {
+  if (envValue === '1' || envValue === 'true') return true;
+  if (envValue === '0' || envValue === 'false') return false;
+  if (typeof configValue === 'boolean') return configValue;
+  return defaultValue;
+}
+
+function _toolsAvailable(cwd) {
+  const cfg = _readConfigResearchTools(cwd);
   return {
-    WebFetch: process.env.NP_TOOLS_WEBFETCH === '1',
-    Context7: process.env.NP_TOOLS_CONTEXT7 === '1',
+    WebFetch: _resolveToolFlag(process.env.NP_TOOLS_WEBFETCH, cfg.WebFetch, DEFAULT_RESEARCH_TOOLS.WebFetch),
+    Context7: _resolveToolFlag(process.env.NP_TOOLS_CONTEXT7, cfg.Context7, DEFAULT_RESEARCH_TOOLS.Context7),
   };
 }
 
@@ -120,7 +142,7 @@ function run(args, ctx) {
     requirements: Array.isArray(def.requirements) ? def.requirements.slice() : [],
     has_research,
     slice_research: sliceResearch,
-    tools_available: _toolsAvailable(),
+    tools_available: _toolsAvailable(cwd),
     text_mode: tmDetail.enabled,
     text_mode_source: tmDetail.source,
     agent_skills: _agentSkills(cwd),
@@ -129,4 +151,4 @@ function run(args, ctx) {
   return payload;
 }
 
-module.exports = { run, INLINE_THRESHOLD_BYTES, _parseMilestoneArg };
+module.exports = { run, INLINE_THRESHOLD_BYTES, _parseMilestoneArg, _toolsAvailable, _resolveToolFlag };

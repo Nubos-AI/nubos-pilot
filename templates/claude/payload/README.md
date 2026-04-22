@@ -7,5 +7,3 @@ Subdirectories (populated in Phase 8 and onwards):
 - `agents/` — agent `.md` files
 - `hooks/` — hook scripts
 - `templates/` — scaffolding templates
-
-See `.planning/phases/07-install-npx-flow/07-RESEARCH.md` §Recommended Project Structure for the full layout.

@@ -17,7 +17,7 @@ You do NOT interview the user. You do NOT edit code. You do NOT re-open scope de
 - `goal`: the milestone's goal string (from `roadmap.yaml`)
 - `requirements`: array of REQ-IDs in scope (from `roadmap.yaml`)
 - `context_path`: path to `<milestone_dir>/<milestone_id>-CONTEXT.md` (just written by the workflow)
-- `requirements_path`: path to `.nubos-pilot/REQUIREMENTS.md` (or `.planning/REQUIREMENTS.md`)
+- `requirements_path`: path to `.nubos-pilot/REQUIREMENTS.md`
 - `existing_success_criteria`: current `success_criteria[]` from roadmap.yaml (may be empty)
 </input>
 

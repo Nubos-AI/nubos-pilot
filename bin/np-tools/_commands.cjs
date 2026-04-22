@@ -51,9 +51,16 @@ const COMMANDS = [
   { name: 'detect-runtime',  category: 'Utility', description: 'Print detected runtime id (claude, codex, gemini, …) — reads config.json ∨ env ∨ default' },
   { name: 'template-path',   category: 'Utility', description: 'Print absolute path to a package-shipped template by name (e.g. VALIDATION, milestone/CONTEXT)' },
   { name: 'update-phase-meta', category: 'Planning', description: 'Update roadmap.yaml phase fields (name/goal/requirements/success_criteria) via JSON patch' },
+  { name: 'phase-meta',        category: 'Planning', description: 'Read roadmap.yaml phase fields as JSON (supports --field NAME and --length for arrays)' },
+  { name: 'state-dir',         category: 'Utility',  description: 'Print project-state directory (.nubos-pilot) or a validated subdir via --subdir NAME' },
+  { name: 'render-template',   category: 'Utility',  description: 'Render a shipped template by name with --vars JSON (or --vars-file PATH)' },
+  { name: 'thread-resume',     category: 'Utility',  description: 'Bump a thread markdown on resume (status OPEN→IN_PROGRESS, refresh last_resumed) via atomic write' },
+  { name: 'state-incr',        category: 'Capture',  description: 'Increment a whitelisted STATE.md counter (e.g. pending_todos) under withFileLock' },
 
   { name: 'thread',           category: 'Utility', description: 'Cross-session thread CRUD (create/resume under .nubos-pilot/threads/)' },
-  { name: 'session-report',   category: 'Utility', description: 'Generate session report from metrics since .last-session pointer' },
+  { name: 'session-aggregate',     category: 'Utility', description: 'Aggregate session metrics under withFileLock; reads pointer .last-session unless --since overrides' },
+  { name: 'session-pointer-write', category: 'Utility', description: 'Atomic write of .nubos-pilot/reports/.last-session under withFileLock (ISO-8601 UTC)' },
+  { name: 'workspace-scan',        category: 'Install', description: 'Scan a workspace and emit inventory JSON (full result or --summary shape for /np:new-project)' },
   { name: 'cleanup',          category: 'Utility', description: 'Archive completed milestones to .nubos-pilot/archive/v<X.Y>/' },
 ];
 

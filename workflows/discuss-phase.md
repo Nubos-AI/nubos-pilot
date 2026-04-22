@@ -340,14 +340,7 @@ CONTEXT_PATH=$(echo "$INIT" | node -e 'let d="";process.stdin.on("data",c=>d+=c)
 mkdir -p "$MILESTONE_DIR"
 mkdir -p "$MILESTONE_DIR/slices"
 
-TPL_PATH=$(node .nubos-pilot/bin/np-tools.cjs template-path milestone/CONTEXT)
-node -e '
-  const { render } = require("./lib/template.cjs");
-  const fs = require("node:fs");
-  const tpl = fs.readFileSync(process.argv[1], "utf-8");
-  const vars = JSON.parse(process.argv[2]);
-  process.stdout.write(render(tpl, vars));
-' "$TPL_PATH" "$VARS_JSON" > "$CONTEXT_PATH"
+node .nubos-pilot/bin/np-tools.cjs render-template milestone/CONTEXT --vars "$VARS_JSON" > "$CONTEXT_PATH"
 ```
 
 `$VARS_JSON` is the JSON-serialised accumulator from Steps 2–5 (keys map to
@@ -379,13 +372,8 @@ SC_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
 SC_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model np-sc-extractor --profile balanced)
 
 REQS_PATH=".nubos-pilot/REQUIREMENTS.md"
-[[ -f "$REQS_PATH" ]] || REQS_PATH=".planning/REQUIREMENTS.md"
 
-EXISTING_SC_JSON=$(node -e '
-  const r = require("./lib/roadmap.cjs");
-  const p = r.getPhase(process.argv[1]);
-  process.stdout.write(JSON.stringify(p.success_criteria || []));
-' "$PHASE")
+EXISTING_SC_JSON=$(node .nubos-pilot/bin/np-tools.cjs phase-meta "$PHASE" --field success_criteria)
 
 # Spawn agent=np-sc-extractor tier=haiku model=$SC_MODEL milestone=$PHASE
 #   input: milestone=$PHASE, milestone_id=$MILESTONE_ID, milestone_dir=$MILESTONE_DIR,
@@ -406,11 +394,7 @@ node .nubos-pilot/bin/np-tools.cjs metrics record \
 After the spawn, sanity-check that `success_criteria` is non-empty:
 
 ```bash
-SC_COUNT=$(node -e '
-  const r = require("./lib/roadmap.cjs");
-  const p = r.getPhase(process.argv[1]);
-  process.stdout.write(String((p.success_criteria || []).length));
-' "$PHASE")
+SC_COUNT=$(node .nubos-pilot/bin/np-tools.cjs phase-meta "$PHASE" --field success_criteria --length)
 if [[ "$SC_COUNT" -lt 1 ]]; then
   echo "ERROR: np-sc-extractor produced no success_criteria for $MILESTONE_ID — refusing to continue." >&2
   exit 1

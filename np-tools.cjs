@@ -51,6 +51,14 @@ const topLevelCommands = {
   'detect-runtime': require('./bin/np-tools/detect-runtime.cjs'),
   'template-path':  require('./bin/np-tools/template-path.cjs'),
   'update-phase-meta': require('./bin/np-tools/update-phase-meta.cjs'),
+  'phase-meta':     require('./bin/np-tools/phase-meta.cjs'),
+  'state-dir':      require('./bin/np-tools/state-dir.cjs'),
+  'render-template': require('./bin/np-tools/render-template.cjs'),
+  'thread-resume':  require('./bin/np-tools/thread-resume.cjs'),
+  'state-incr':     require('./bin/np-tools/state-incr.cjs'),
+  'session-aggregate':     require('./bin/np-tools/session-aggregate.cjs'),
+  'session-pointer-write': require('./bin/np-tools/session-pointer-write.cjs'),
+  'workspace-scan': require('./bin/np-tools/workspace-scan.cjs'),
 };
 
 const THRESHOLD = 16 * 1024;

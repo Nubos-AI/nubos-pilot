@@ -35,7 +35,7 @@ if [[ -z "$SLUG" ]]; then
   echo "Error: argument produced no slug-safe characters." >&2
   exit 1
 fi
-STATE_DIR=$(node -e "console.log(require('./lib/core.cjs').projectStateDir(process.cwd()))")
+STATE_DIR=$(node .nubos-pilot/bin/np-tools.cjs state-dir)
 THREADS_DIR="${STATE_DIR}/threads"
 THREAD_PATH="${THREADS_DIR}/${SLUG}.md"
 TODAY=$(date +%Y-%m-%d)
@@ -119,35 +119,11 @@ order.
 
 ```bash
 if [[ "$MODE" == "resume" ]]; then
-  node -e "
-    const fs = require('node:fs');
-    const { extractFrontmatter } = require('./lib/frontmatter.cjs');
-    const { atomicWriteFileSync } = require('./lib/core.cjs');
-    const p = process.argv[1];
-    const today = process.argv[2];
-    const raw = fs.readFileSync(p, 'utf-8');
-    const { frontmatter, body } = extractFrontmatter(raw);
-    const next = Object.assign({}, frontmatter);
-    const cur = String(next.status || 'OPEN');
-    if (cur === 'OPEN') next.status = 'IN_PROGRESS';
-    next.last_resumed = today;
-    const order = ['slug', 'status', 'created', 'last_resumed'];
-    const seen = new Set();
-    const lines = ['---'];
-    for (const k of order) {
-      if (k in next) { lines.push(k + ': ' + next[k]); seen.add(k); }
-    }
-    for (const k of Object.keys(next)) {
-      if (!seen.has(k)) lines.push(k + ': ' + next[k]);
-    }
-    lines.push('---');
-    const out = lines.join('\n') + '\n' + body;
-    atomicWriteFileSync(p, out);
-  " "$THREAD_PATH" "$TODAY"
+  node .nubos-pilot/bin/np-tools.cjs thread-resume "$THREAD_PATH" --today "$TODAY" > /dev/null
   echo "Thread resumed: $THREAD_PATH"
   echo ""
   echo "--- thread content ---"
-  node -e "process.stdout.write(require('node:fs').readFileSync(process.argv[1], 'utf-8'))" "$THREAD_PATH"
+  cat "$THREAD_PATH"
 fi
 ```
 

@@ -82,18 +82,18 @@ test('RP-2: has_research=true iff {milestone_dir}/{milestone_id}-RESEARCH.md exi
   assert.equal(payload.has_research, true);
 });
 
-test('RP-3: tools_available defaults to {false,false} when env vars absent', () => {
+test('RP-3: tools_available defaults to {true,true} when env vars + config absent (optimistic default)', () => {
   const sandbox = makeSandbox();
   seedRoadmapYaml(sandbox, _baseRoadmap());
   _clearEnv();
   const cap = _captureStdout();
   subcmd.run(['5'], { cwd: sandbox, stdout: cap.stub });
   const payload = JSON.parse(cap.get().trim());
-  assert.equal(payload.tools_available.WebFetch, false);
-  assert.equal(payload.tools_available.Context7, false);
+  assert.equal(payload.tools_available.WebFetch, true);
+  assert.equal(payload.tools_available.Context7, true);
 });
 
-test('RP-4: NP_TOOLS_WEBFETCH=1 and NP_TOOLS_CONTEXT7=1 flip both booleans', () => {
+test('RP-4: NP_TOOLS_WEBFETCH=1 and NP_TOOLS_CONTEXT7=1 keep both true', () => {
   const sandbox = makeSandbox();
   seedRoadmapYaml(sandbox, _baseRoadmap());
   process.env.NP_TOOLS_WEBFETCH = '1';
@@ -103,6 +103,55 @@ test('RP-4: NP_TOOLS_WEBFETCH=1 and NP_TOOLS_CONTEXT7=1 flip both booleans', () 
   const payload = JSON.parse(cap.get().trim());
   assert.equal(payload.tools_available.WebFetch, true);
   assert.equal(payload.tools_available.Context7, true);
+});
+
+test('RP-4b: NP_TOOLS_WEBFETCH=0 and NP_TOOLS_CONTEXT7=0 flip both booleans to false', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _baseRoadmap());
+  process.env.NP_TOOLS_WEBFETCH = '0';
+  process.env.NP_TOOLS_CONTEXT7 = '0';
+  const cap = _captureStdout();
+  subcmd.run(['5'], { cwd: sandbox, stdout: cap.stub });
+  const payload = JSON.parse(cap.get().trim());
+  assert.equal(payload.tools_available.WebFetch, false);
+  assert.equal(payload.tools_available.Context7, false);
+});
+
+test('RP-4c: config.workflow.research_tools overrides default when env absent', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _baseRoadmap());
+  const configPath = path.join(sandbox, '.nubos-pilot', 'config.json');
+  fs.writeFileSync(configPath, JSON.stringify({
+    workflow: { research_tools: { WebFetch: false, Context7: true } },
+  }));
+  _clearEnv();
+  const cap = _captureStdout();
+  subcmd.run(['5'], { cwd: sandbox, stdout: cap.stub });
+  const payload = JSON.parse(cap.get().trim());
+  assert.equal(payload.tools_available.WebFetch, false);
+  assert.equal(payload.tools_available.Context7, true);
+});
+
+test('RP-4d: env var wins over config (env=1 overrides config=false)', () => {
+  const sandbox = makeSandbox();
+  seedRoadmapYaml(sandbox, _baseRoadmap());
+  const configPath = path.join(sandbox, '.nubos-pilot', 'config.json');
+  fs.writeFileSync(configPath, JSON.stringify({
+    workflow: { research_tools: { WebFetch: false, Context7: false } },
+  }));
+  process.env.NP_TOOLS_WEBFETCH = '1';
+  const cap = _captureStdout();
+  subcmd.run(['5'], { cwd: sandbox, stdout: cap.stub });
+  const payload = JSON.parse(cap.get().trim());
+  assert.equal(payload.tools_available.WebFetch, true);
+  assert.equal(payload.tools_available.Context7, false);
+});
+
+test('RP-4e: _resolveToolFlag: "true"/"false" strings handled', () => {
+  assert.equal(subcmd._resolveToolFlag('true', false, false), true);
+  assert.equal(subcmd._resolveToolFlag('false', true, true), false);
+  assert.equal(subcmd._resolveToolFlag(undefined, undefined, true), true);
+  assert.equal(subcmd._resolveToolFlag(undefined, false, true), false);
 });
 
 test('RP-5: missing phase number throws research-phase-not-found', () => {

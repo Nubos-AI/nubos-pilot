@@ -45,7 +45,7 @@ Before auditing, load:
 <execution_flow>
 
 <step name="load_requirements">
-Filter `.planning/REQUIREMENTS.md` (or `.nubos-pilot/REQUIREMENTS.md` if present) to the phase's `requirements[]` list supplied in input.
+Filter `.nubos-pilot/REQUIREMENTS.md` to the phase's `requirements[]` list supplied in input.
 
 Also extract requirement-ID references from each slice's `S<NNN>-PLAN.md` and each task's `T<NNNN>-PLAN.md` frontmatter `requirements:` + `must_haves:` blocks — they often imply requirement coverage without explicit REQ-ID mapping; capture those as additional observation targets.
 

@@ -40,7 +40,7 @@ for arg in "$@"; do
   esac
 done
 
-STATE_DIR=$(node -e "console.log(require('./lib/core.cjs').projectStateDir(process.cwd()))")
+STATE_DIR=$(node .nubos-pilot/bin/np-tools.cjs state-dir)
 REPORTS_DIR="${STATE_DIR}/reports"
 POINTER="${REPORTS_DIR}/.last-session"
 mkdir -p "$REPORTS_DIR"
@@ -80,21 +80,11 @@ between "read pointer" and "write new pointer" (T-10-06-02 / Pitfall
 longer hit `lock-timeout` from `lib/core.cjs.NubosPilotError`.
 
 ```bash
-REPORT_JSON=$(node -e '
-  const fs = require("node:fs");
-  const { withFileLock } = require("./lib/core.cjs");
-  const { aggregateSession } = require("./lib/metrics-aggregate.cjs");
-  const pointer = process.argv[1];
-  const override = process.argv[2] || "";
-  const done = withFileLock(pointer, async () => {
-    let since = override || "";
-    if (!override && fs.existsSync(pointer)) {
-      since = fs.readFileSync(pointer, "utf-8").trim();
-    }
-    return aggregateSession(since || null, { cwd: process.cwd() });
-  }, { timeoutMs: 10000 });
-  Promise.resolve(done).then((r) => process.stdout.write(JSON.stringify(r)));
-' "$POINTER" "$SINCE_OVERRIDE")
+if [[ -n "$SINCE_OVERRIDE" ]]; then
+  REPORT_JSON=$(node .nubos-pilot/bin/np-tools.cjs session-aggregate --since "$SINCE_OVERRIDE")
+else
+  REPORT_JSON=$(node .nubos-pilot/bin/np-tools.cjs session-aggregate)
+fi
 ```
 
 The `aggregateSession` helper returns
@@ -150,14 +140,7 @@ and "update pointer" leaves the pointer STALE — the next run
 re-covers the missing period (safe-by-default).
 
 ```bash
-node -e '
-  const { withFileLock, atomicWriteFileSync } = require("./lib/core.cjs");
-  withFileLock(
-    process.argv[1],
-    () => atomicWriteFileSync(process.argv[1], process.argv[2]),
-    { timeoutMs: 10000 }
-  );
-' "$POINTER" "$NOW_ISO"
+node .nubos-pilot/bin/np-tools.cjs session-pointer-write "$NOW_ISO" > /dev/null
 ```
 
 Using `atomicWriteFileSync` ensures the pointer update is crash-safe
