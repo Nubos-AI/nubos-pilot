@@ -370,18 +370,66 @@ If the template lacks a key, `render()` throws
 `NubosPilotError('template-missing-key', …)` — the workflow must not swallow
 that error. Fix the template or the accumulator, don't mask the failure.
 
+### Step 6b: Extract + persist Success Criteria (np-sc-extractor)
+
+CONTEXT.md now captures the decisions. Success Criteria in `roadmap.yaml` are still empty for this milestone — downstream `/np:verify-work` reads them from there, so we must persist them now. Spawn the SC-extractor (haiku) to derive observable SCs from goal + requirements + CONTEXT.md + any pre-existing `M<NNN>-ROADMAP.md` / `M<NNN>-META.json` sidecars, and call `update-phase-meta` to write them.
+
+```bash
+SC_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
+SC_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model np-sc-extractor --profile balanced)
+
+REQS_PATH=".nubos-pilot/REQUIREMENTS.md"
+[[ -f "$REQS_PATH" ]] || REQS_PATH=".planning/REQUIREMENTS.md"
+
+EXISTING_SC_JSON=$(node -e '
+  const r = require("./lib/roadmap.cjs");
+  const p = r.getPhase(process.argv[1]);
+  process.stdout.write(JSON.stringify(p.success_criteria || []));
+' "$PHASE")
+
+# Spawn agent=np-sc-extractor tier=haiku model=$SC_MODEL milestone=$PHASE
+#   input: milestone=$PHASE, milestone_id=$MILESTONE_ID, milestone_dir=$MILESTONE_DIR,
+#          context_path=$CONTEXT_PATH, requirements_path=$REQS_PATH,
+#          existing_success_criteria=$EXISTING_SC_JSON
+#   output: calls `np-tools.cjs update-phase-meta $PHASE --stdin` with
+#           {"success_criteria": [{id:"SC-N", text:"..."}, ...]} and prints summary.
+
+SC_END=$(node .nubos-pilot/bin/np-tools.cjs metrics end-timestamp)
+node .nubos-pilot/bin/np-tools.cjs metrics record \
+  --agent np-sc-extractor --tier haiku --resolved-model "$SC_MODEL" \
+  --phase "$PHASE" --plan "${MILESTONE_ID}-sc" --task "${MILESTONE_ID}-sc-extract" \
+  --started "$SC_START" --ended "$SC_END" \
+  --tokens-in "${TOKENS_IN:-0}" --tokens-out "${TOKENS_OUT:-0}" \
+  --retry-count 0 --status ok --runtime "$RUNTIME"
+```
+
+After the spawn, sanity-check that `success_criteria` is non-empty:
+
+```bash
+SC_COUNT=$(node -e '
+  const r = require("./lib/roadmap.cjs");
+  const p = r.getPhase(process.argv[1]);
+  process.stdout.write(String((p.success_criteria || []).length));
+' "$PHASE")
+if [[ "$SC_COUNT" -lt 1 ]]; then
+  echo "ERROR: np-sc-extractor produced no success_criteria for $MILESTONE_ID — refusing to continue." >&2
+  exit 1
+fi
+```
+
+A failure here is loud by design: `/np:verify-work` and `/np:validate-phase` depend on a populated `success_criteria[]`. If the extractor cannot derive any, fix the goal/requirements/CONTEXT.md inputs before retrying.
+
 ### Step 7: Commit respecting config.commit_docs
 
 ```bash
 COMMIT_DOCS=$(node .nubos-pilot/bin/np-tools.cjs config-get workflow.commit_docs 2>/dev/null || echo "true")
 if [[ "$COMMIT_DOCS" == "true" ]]; then
-  git add "$CONTEXT_PATH"
-  git commit -m "docs($MILESTONE_ID): capture milestone context"
+  git add "$CONTEXT_PATH" .nubos-pilot/roadmap.yaml .nubos-pilot/ROADMAP.md
+  git commit -m "docs($MILESTONE_ID): capture milestone context + success criteria"
 fi
 ```
 
-If `workflow.commit_docs` is false, leave the file uncommitted — the user is
-opting into manual commit gating.
+If `workflow.commit_docs` is false, leave both CONTEXT.md and the roadmap edits uncommitted — the user is opting into manual commit gating.
 
 ### Step 8: Confirm and next steps
 

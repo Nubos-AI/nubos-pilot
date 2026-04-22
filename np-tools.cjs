@@ -50,6 +50,7 @@ const topLevelCommands = {
   'text-mode':      require('./bin/np-tools/text-mode.cjs'),
   'detect-runtime': require('./bin/np-tools/detect-runtime.cjs'),
   'template-path':  require('./bin/np-tools/template-path.cjs'),
+  'update-phase-meta': require('./bin/np-tools/update-phase-meta.cjs'),
 };
 
 const THRESHOLD = 16 * 1024;

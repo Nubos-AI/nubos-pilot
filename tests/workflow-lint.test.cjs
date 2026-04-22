@@ -145,6 +145,30 @@ test('WFL-6: new-project workflow references discuss-project and scan-codebase',
   assert.ok(raw.includes('scan-codebase'), 'new-project should mention scan-codebase');
 });
 
+test('WFL-8: discuss-phase spawns np-sc-extractor and persists via update-phase-meta', () => {
+  const file = path.join(WORKFLOWS_DIR, 'discuss-phase.md');
+  const raw = fs.readFileSync(file, 'utf-8');
+  assert.ok(raw.includes('np-sc-extractor'),
+    'discuss-phase must spawn np-sc-extractor so roadmap.yaml success_criteria get populated');
+  assert.ok(raw.includes('update-phase-meta'),
+    'discuss-phase must reference update-phase-meta as the persistence helper');
+});
+
+test('WFL-9: plan-phase Gate 1b blocks on empty success_criteria', () => {
+  const file = path.join(WORKFLOWS_DIR, 'plan-phase.md');
+  const raw = fs.readFileSync(file, 'utf-8');
+  assert.ok(raw.includes('success_criteria.length == 0') || raw.includes('Empty success_criteria'),
+    'plan-phase must guard against empty success_criteria (otherwise verify-work downstream blocks)');
+});
+
+test('WFL-10: np-sc-extractor agent file exists and matches workflow contract', () => {
+  const agentPath = path.join(REPO_ROOT, 'agents', 'np-sc-extractor.md');
+  assert.ok(fs.existsSync(agentPath), 'agents/np-sc-extractor.md must exist');
+  const raw = fs.readFileSync(agentPath, 'utf-8');
+  assert.ok(/name:\s*np-sc-extractor/.test(raw), 'frontmatter name must be np-sc-extractor');
+  assert.ok(raw.includes('update-phase-meta'), 'agent must call update-phase-meta to persist SCs');
+});
+
 test('WFL-7: legacy allow-lists only cover files that still exist', () => {
   for (const base of LEGACY_MISSING_FRONTMATTER) {
     assert.ok(

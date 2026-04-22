@@ -76,6 +76,36 @@ function renderBar(used, limit) {
   return color + bar + '\x1b[0m ' + pct + '%' + suffix;
 }
 
+function terminalWidth() {
+  const envCols = Number(process.env.COLUMNS);
+  if (Number.isFinite(envCols) && envCols > 0) return envCols;
+  if (process.stdout && process.stdout.columns) return process.stdout.columns;
+  try {
+    const { execSync } = require('node:child_process');
+    const out = execSync('tput cols', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const n = Number(out);
+    if (Number.isFinite(n) && n > 0) return n;
+  } catch {}
+  return 120;
+}
+
+function visibleLen(s) {
+  const stripped = s.replace(/\x1b\[[0-9;]*m/g, '');
+  let w = 0;
+  for (const ch of stripped) {
+    const cp = ch.codePointAt(0);
+    if (cp > 0xFFFF) w += 2;
+    else w += 1;
+  }
+  return w;
+}
+
+function centerLine(line) {
+  const width = terminalWidth();
+  const pad = Math.max(0, Math.floor((width - visibleLen(line)) / 2));
+  return ' '.repeat(pad) + line;
+}
+
 function writeBridge(payload, usage, limit) {
   const sid = payload && payload.session_id;
   if (!sid) return;
@@ -97,14 +127,14 @@ function writeBridge(payload, usage, limit) {
   const usage = lastUsage(payload && payload.transcript_path);
   const prefix = '\x1b[38;5;33mnubos-pilot\x1b[0m';
   if (!usage) {
-    process.stdout.write(prefix);
+    process.stdout.write(centerLine(prefix));
     return;
   }
   writeBridge(payload, usage, limit);
   const bar = renderBar(usage.total, limit);
   const modelName = (payload && payload.model && payload.model.display_name) || '';
   const tail = modelName ? '  \x1b[2m' + modelName + '\x1b[0m' : '';
-  process.stdout.write(prefix + '  ctx ' + bar + tail);
+  process.stdout.write(centerLine(prefix + '  ctx ' + bar + tail));
 })().catch(() => {
   process.stdout.write('\x1b[38;5;33mnubos-pilot\x1b[0m');
 });

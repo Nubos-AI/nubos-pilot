@@ -536,6 +536,21 @@ async function _runInstallLocked(ctx) {
     console.error(yellow + '  [codex] repair skipped: ' + (err && err.message) + reset);
   }
   manifestMod.writeManifest(payloadDir, newManifest);
+  if (selectedRuntimesEarly.includes('claude')) {
+    try {
+      const claudeHooks = require('../lib/install/claude-hooks.cjs');
+      const res = claudeHooks.installClaudeHooks({
+        projectRoot, scope: resolvedScope, which: 'both', force: false,
+      });
+      console.error(dim + '  [claude-hooks] statusline: ' + res.results.statusline.action
+        + ', ctx-monitor: ' + res.results.ctxMonitor.action + reset);
+      if (res.results.statusline.action === 'skipped-existing') {
+        console.error(yellow + '  [claude-hooks] foreign statusLine preserved — re-run `install-hooks --force` to overwrite' + reset);
+      }
+    } catch (err) {
+      console.error(yellow + '  [claude-hooks] skipped: ' + (err && err.message) + reset);
+    }
+  }
   console.error(green + '✓ Installation abgeschlossen' + reset);
   return { mode, dryRun: false, written: Object.keys(newManifest.files).length,
     backedUp: backupLog.length, deleted: diff.stale.length };

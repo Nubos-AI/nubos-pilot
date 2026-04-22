@@ -118,6 +118,29 @@ case "$CHOICE" in
 esac
 ```
 
+### Gate 1b — Empty success_criteria
+
+If `success_criteria.length == 0`:
+
+```bash
+CHOICE=$(node .nubos-pilot/bin/np-tools.cjs askuser --json '{
+  "type": "select",
+  "header": "No SCs in roadmap.yaml",
+  "question": "Milestone has no success_criteria in roadmap.yaml. Downstream /np:verify-work will produce an empty VERIFICATION.md. How to proceed?",
+  "options": [
+    {"label": "Run /np:discuss-phase first", "description": "Recommended — np-sc-extractor derives SCs from CONTEXT.md + goal + requirements and writes them to roadmap.yaml."},
+    {"label": "Continue anyway",             "description": "Plan the milestone without SCs; you must back-fill them before /np:verify-work."},
+    {"label": "Abort",                       "description": "Exit without changes."}
+  ]
+}')
+case "$CHOICE" in
+  "Run /np:discuss-phase"*) echo "Run: /np:discuss-phase $PHASE"; exit 0 ;;
+  "Abort")                  exit 0 ;;
+esac
+```
+
+The planner will still emit a plan without SCs, but you are consciously opting into a known-broken verify-work path. The safer default is always to re-run `/np:discuss-phase` — Step 6b there spawns `np-sc-extractor` which populates `roadmap.yaml` directly.
+
 ### Gate 2 — Missing slice RESEARCH.md
 
 Research is per-slice  (`slices/S<NNN>/S<NNN>-RESEARCH.md`). The planner can plan without research, but if the roadmap config requires it, ask. The `--research` flag auto-dispatches `/np:research-phase` before re-entering.
