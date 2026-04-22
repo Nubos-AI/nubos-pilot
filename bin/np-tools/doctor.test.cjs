@@ -85,6 +85,35 @@ test('DOC-4: flags codebase-tbd-docs for modules with _TBD Purpose', async () =>
   assert.ok(tbd.details.count >= 1);
 });
 
+test('DOC-6: asset manifest keys resolve to project root, not payloadDir', async () => {
+  const root = makeSandbox();
+
+  const payloadDir = path.join(root, '.claude', 'nubos-pilot');
+  fs.mkdirSync(payloadDir, { recursive: true });
+  fs.writeFileSync(path.join(payloadDir, '.manifest.json'), JSON.stringify({
+    version: '0.0.0',
+    timestamp: new Date().toISOString(),
+    files: {
+      '.claude/commands/np/foo.md': 'deadbeef',
+      '.claude/agents/np-bar.md': 'deadbeef',
+    },
+  }));
+  const cmdDir = path.join(root, '.claude', 'commands', 'np');
+  const agentsDir = path.join(root, '.claude', 'agents');
+  fs.mkdirSync(cmdDir, { recursive: true });
+  fs.mkdirSync(agentsDir, { recursive: true });
+  fs.writeFileSync(path.join(cmdDir, 'foo.md'), 'x');
+  fs.writeFileSync(path.join(agentsDir, 'np-bar.md'), 'y');
+
+  const cap = captureStdout();
+  await doctor.run([], { cwd: root, stdout: cap.stub, stderr: cap.stub, askUser: async () => ({ value: false }) });
+  const out = cap.json();
+  const missing = out.issues.filter((i) => i.id === 'payload-missing');
+  assert.equal(missing.length, 0,
+    'asset keys must resolve to project-root paths (found ' +
+    missing.map((m) => m.file).join(', ') + ')');
+});
+
 test('DOC-5: no tbd flag after prose applied', async () => {
   const root = makeSandbox();
   fs.mkdirSync(path.join(root, 'src'), { recursive: true });

@@ -7,15 +7,45 @@ const path = require('node:path');
 const { NubosPilotError, atomicWriteFileSync } = require('../../lib/core.cjs');
 const manifestMod = require('../../lib/install/manifest.cjs');
 const codexTomlMod = require('../../lib/install/codex-toml.cjs');
+const runtimeAssetsMod = require('../../lib/install/runtime-assets.cjs');
 const askuserMod = require('../../lib/askuser.cjs');
 const codebaseManifest = require('../../lib/codebase-manifest.cjs');
 const { scan: workspaceScan } = require('../../lib/workspace-scan.cjs');
 
 const PAYLOAD_SUBPATH = path.join('.claude', 'nubos-pilot');
+const STATE_SUBPATH = '.nubos-pilot';
 const CODEX_CONFIG_PATH = path.join(os.homedir(), '.codex', 'config.toml');
+const OPENCODE_LOCAL_PREFIX = '.opencode/nubos-pilot/';
+const OPENCODE_GLOBAL_PREFIX = '~/.config/opencode/nubos-pilot/';
 
-function _payloadDirFor(projectRoot) {
-  return path.join(projectRoot, PAYLOAD_SUBPATH);
+function _readScope(projectRoot) {
+  const cfgPath = path.join(projectRoot, STATE_SUBPATH, 'config.json');
+  if (!fs.existsSync(cfgPath)) return 'local';
+  try {
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    return cfg && cfg.scope === 'global' ? 'global' : 'local';
+  } catch {
+    return 'local';
+  }
+}
+
+function _payloadBaseFor(projectRoot, scope) {
+  return scope === 'global' ? os.homedir() : projectRoot;
+}
+
+function _payloadDirFor(projectRoot, scope) {
+  return path.join(_payloadBaseFor(projectRoot, scope), PAYLOAD_SUBPATH);
+}
+
+function _resolveManifestEntry(rel, projectRoot, scope) {
+  if (rel.startsWith('~/')) {
+    return path.join(os.homedir(), rel.slice(2));
+  }
+  const base = _payloadBaseFor(projectRoot, scope);
+  if (runtimeAssetsMod.isAssetManifestKey(rel) || rel.startsWith(OPENCODE_LOCAL_PREFIX)) {
+    return path.join(base, rel);
+  }
+  return path.join(_payloadDirFor(projectRoot, scope), rel);
 }
 
 function _pkgVersion() {
@@ -26,8 +56,9 @@ function _pkgVersion() {
   }
 }
 
-function _checkManifestIntegrity(payloadDir) {
+function _checkManifestIntegrity(projectRoot, scope) {
   const issues = [];
+  const payloadDir = _payloadDirFor(projectRoot, scope);
   let manifest = null;
   try {
     manifest = manifestMod.readManifest(payloadDir);
@@ -51,7 +82,7 @@ function _checkManifestIntegrity(payloadDir) {
   }
   const files = (manifest.files && typeof manifest.files === 'object') ? manifest.files : {};
   for (const rel of Object.keys(files)) {
-    const full = path.join(payloadDir, rel);
+    const full = _resolveManifestEntry(rel, projectRoot, scope);
     if (!fs.existsSync(full)) {
       issues.push({
         id: 'payload-missing',
@@ -306,9 +337,10 @@ function _checkMilestoneLayout(projectRoot) {
 }
 
 function _audit(projectRoot) {
-  const payloadDir = _payloadDirFor(projectRoot);
+  const scope = _readScope(projectRoot);
+  const payloadDir = _payloadDirFor(projectRoot, scope);
   const issues = [];
-  const { manifest, issues: manifestIssues } = _checkManifestIntegrity(payloadDir);
+  const { manifest, issues: manifestIssues } = _checkManifestIntegrity(projectRoot, scope);
   issues.push(...manifestIssues);
   issues.push(..._checkVersionMismatch(manifest));
   issues.push(..._checkHooksMissing(manifest, payloadDir));
