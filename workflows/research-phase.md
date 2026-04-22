@@ -209,7 +209,7 @@ omit the `model:` parameter at spawn (Phase 8 D-22 inherit-pattern).
 
 ```bash
 RESEARCHER_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
-RESEARCHER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model researcher --profile balanced)
+RESEARCHER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model np-researcher --profile balanced)
 ```
 
 ```text

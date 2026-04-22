@@ -106,7 +106,7 @@ for WAVE_INDEX in 0 1 2 ...; do
     if [[ "$TASK_JSON" == @file:* ]]; then TASK_JSON=$(cat "${TASK_JSON#@file:}"); fi
 
     EXECUTOR_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
-    EXECUTOR_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model executor --profile frontier)
+    EXECUTOR_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model np-executor --profile frontier)
 
     # Spawn agents/np-executor.md (tier: sonnet, model resolved as $EXECUTOR_MODEL)
     # with a <files_to_read> block containing: the task plan file, the slice

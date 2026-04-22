@@ -215,7 +215,7 @@ for ITER in 1 2; do
 
   # --- Spawn planner ---
   PLANNER_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
-  PLANNER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model planner --profile frontier)
+  PLANNER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model np-planner --profile frontier)
   # Spawn agent=np-planner tier=opus model=$PLANNER_MODEL mode=$MODE milestone=$PHASE
   #   milestone_dir=$milestone_dir goal=$goal requirements=$requirements
   #   prior_findings=$LAST_FINDINGS agent_skills=$AGENT_SKILLS_PLANNER
@@ -229,7 +229,7 @@ for ITER in 1 2; do
 
   # --- Spawn plan-checker ---
   CHECKER_START=$(node .nubos-pilot/bin/np-tools.cjs metrics start-timestamp)
-  CHECKER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model plan-checker --profile frontier)
+  CHECKER_MODEL=$(node .nubos-pilot/bin/np-tools.cjs resolve-model np-plan-checker --profile frontier)
   # Spawn agent=np-plan-checker tier=opus model=$CHECKER_MODEL milestone=$PHASE
   #   milestone_dir=$milestone_dir agent_skills=$AGENT_SKILLS_CHECKER
   # Checker writes YAML verdict; orchestrator converts to JSON.
