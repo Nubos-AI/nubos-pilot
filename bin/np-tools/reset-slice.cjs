@@ -8,6 +8,11 @@ const { restoreFiles } = require('../../lib/git.cjs');
 const { deleteCheckpoint, listCheckpoints } = require('../../lib/checkpoint.cjs');
 const layout = require('../../lib/layout.cjs');
 const { extractFrontmatter } = require('../../lib/frontmatter.cjs');
+const {
+  hasSliceWorktree,
+  removeSliceWorktree,
+  worktreeIsolationEnabled,
+} = require('../../lib/worktree.cjs');
 
 function _resolveTaskId(explicit, cwd) {
   if (explicit) {
@@ -44,13 +49,33 @@ function _readTaskFiles(taskId, cwd) {
   return Array.isArray(frontmatter.files_modified) ? frontmatter.files_modified : [];
 }
 
+function _maybeRemoveWorktreeForTask(taskId, cwd) {
+  if (!worktreeIsolationEnabled(cwd)) return null;
+  let parsed;
+  try { parsed = layout.parseTaskFullId(taskId); } catch { return null; }
+  const sliceFullId = layout.sliceFullId(parsed.milestone, parsed.slice);
+  let exists = false;
+  try { exists = hasSliceWorktree(sliceFullId, cwd); } catch { exists = false; }
+  if (!exists) return null;
+  try {
+    return removeSliceWorktree(sliceFullId, cwd, { force: true });
+  } catch (err) {
+    process.stderr.write(
+      '[nubos-pilot warn] removeSliceWorktree failed for ' + sliceFullId + ': ' + ((err && err.message) || err) + '\n',
+    );
+    return null;
+  }
+}
+
 function run(args, ctx) {
   const context = ctx || {};
   const cwd = context.cwd || process.cwd();
   const stdout = context.stdout || process.stdout;
   const list = Array.isArray(args) ? args : [];
 
-  const explicit = list[0] && !list[0].startsWith('--') ? list[0] : null;
+  const keepWorktree = list.includes('--keep-worktree');
+  const positional = list.filter((a) => a && !a.startsWith('--'));
+  const explicit = positional[0] || null;
   const taskId = _resolveTaskId(explicit, cwd);
 
   if (!taskId) {
@@ -91,12 +116,16 @@ function run(args, ctx) {
     return { frontmatter: fm, body: state.body };
   }, cwd);
 
+  const worktreeRemoved = keepWorktree ? null : _maybeRemoveWorktreeForTask(taskId, cwd);
+
   const payload = {
     ok: true,
     task_id: taskId,
     restored_files: files,
     deleted_checkpoints: [taskId],
-    message: 'in-flight task discarded; working tree restored to HEAD',
+    worktree_removed: worktreeRemoved,
+    message: 'in-flight task discarded; working tree restored to HEAD'
+      + (worktreeRemoved ? '; worktree ' + worktreeRemoved.branch + ' removed' : ''),
   };
   stdout.write(JSON.stringify(payload));
   return payload;

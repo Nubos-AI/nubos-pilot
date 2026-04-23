@@ -1,7 +1,8 @@
 # ADR-0008: Worktree Isolation per Slice
 
-* Status: **Draft**
+* Status: **Accepted**
 * Date: 2026-04-23
+* Accepted: 2026-04-23 (all 11 decisions D-8.1..D-8.11 ratified at defaults)
 * Supersedes: None
 * Relates-to: [ADR-0001](0001-no-daemon-invariant.md), [ADR-0004](0004-atomic-commit-per-unit.md), [ADR-0005](0005-three-orthogonal-file-trees.md)
 

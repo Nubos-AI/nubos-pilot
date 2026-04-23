@@ -59,6 +59,11 @@ const COMMANDS = [
   { name: 'handoff-read',      category: 'Capture',  description: 'Read a single handoff by id (returns frontmatter + body as JSON)' },
   { name: 'handoff-list',      category: 'Capture',  description: 'List handoffs (JSON array); filter with --for AGENT, --milestone M<NNN>, --status STATUS, --global' },
   { name: 'handoff-status',    category: 'Capture',  description: 'Update a handoff status (open|read|acted|archived)' },
+  { name: 'worktree-create',   category: 'Execution', description: 'Create an isolated git worktree for a slice (branch np/<mid>-<sid> off current HEAD) under .nubos-pilot/worktrees/' },
+  { name: 'worktree-remove',   category: 'Execution', description: 'Remove a slice worktree + delete its branch (--force / --keep-branch)' },
+  { name: 'worktree-list',     category: 'Execution', description: 'List all nubos-pilot-managed slice worktrees (np/<mid>-<sid> only) as JSON' },
+  { name: 'worktree-ff-merge', category: 'Execution', description: 'Fast-forward merge a slice branch back to its base (fails hard on non-FF)' },
+  { name: 'dashboard',         category: 'Utility',   description: 'One-shot console dashboard of milestones/slices/handoffs/worktrees (--json, --no-color, --watch [seconds])' },
   { name: 'thread-resume',     category: 'Utility',  description: 'Bump a thread markdown on resume (status OPEN→IN_PROGRESS, refresh last_resumed) via atomic write' },
   { name: 'state-incr',        category: 'Capture',  description: 'Increment a whitelisted STATE.md counter (e.g. pending_todos) under withFileLock' },
 

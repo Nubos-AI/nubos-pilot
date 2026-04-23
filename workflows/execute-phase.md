@@ -21,6 +21,7 @@ INIT=$(node .nubos-pilot/bin/np-tools.cjs init execute-milestone init "$PHASE")
 if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 AGENT_SKILLS_EXECUTOR=$(node .nubos-pilot/bin/np-tools.cjs agent-skills executor 2>/dev/null)
 RUNTIME=$(node .nubos-pilot/bin/np-tools.cjs detect-runtime)
+WORKTREE_ISOLATION=$(node .nubos-pilot/bin/np-tools.cjs config-get workflow.worktree_isolation 2>/dev/null || echo "false")
 ```
 
 **Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
@@ -95,6 +96,18 @@ for WAVE_INDEX in 0 1 2 ...; do
 
   echo "=== Wave $((WAVE_INDEX+1)): $SLICE_FULL_ID — tasks: $TASK_IDS ===" >&2
 
+  # Worktree-Isolation (ADR-0008): when workflow.worktree_isolation=true,
+  # create an isolated git worktree for this slice before spawning executors.
+  # Executors run inside the worktree (cwd = worktree path), commits land on
+  # the slice branch np/<slice-full-id>, and the slice is fast-forward merged
+  # back on success. On failure: worktree stays in place for inspection.
+  SLICE_CWD="$PWD"
+  if [ "$WORKTREE_ISOLATION" = "true" ]; then
+    WT_CREATE=$(node .nubos-pilot/bin/np-tools.cjs worktree-create "$SLICE_FULL_ID")
+    SLICE_CWD=$(echo "$WT_CREATE" | node -e "process.stdin.on('data', d => console.log(JSON.parse(d).path))")
+    echo "[np:execute-phase] worktree created at $SLICE_CWD (branch np/$SLICE_FULL_ID)" >&2
+  fi
+
   # For each task id in TASK_IDS, spawn an executor IN PARALLEL.
   # The orchestrator's parallel primitive dispatches all of them in a single
   # message (multiple Agent tool use blocks in one send).
@@ -131,6 +144,9 @@ for WAVE_INDEX in 0 1 2 ...; do
 
     if [ "$COMMIT_STATUS" -ne 0 ]; then
       echo "[np:execute-phase] commit-task failed for $TASK_ID — aborting wave $SLICE_FULL_ID." >&2
+      if [ "$WORKTREE_ISOLATION" = "true" ]; then
+        echo "  Worktree $SLICE_CWD left in place for inspection. Clean up with: /np:reset-slice $TASK_ID" >&2
+      fi
       exit "$COMMIT_STATUS"
     fi
   done
@@ -140,6 +156,23 @@ for WAVE_INDEX in 0 1 2 ...; do
   # the slice-level S<NNN>-SUMMARY.md so /np:validate-phase can audit it.
   SLICE_NUM=$(echo "$WAVE" | node -e "process.stdin.on('data', d => console.log(JSON.parse(d).wave))")
   node .nubos-pilot/bin/np-tools.cjs init execute-milestone finalize-slice "$PHASE" "$SLICE_NUM" >/dev/null
+
+  # Worktree merge-back (ADR-0008 D-8.7): fast-forward-only merge the slice
+  # branch back onto the invoking workspace's current branch. Non-FF (e.g.
+  # because the base branch advanced during execution) fails hard — that
+  # surfaces the drift to the user rather than silently rewriting task SHAs.
+  if [ "$WORKTREE_ISOLATION" = "true" ]; then
+    FF_RESULT=$(node .nubos-pilot/bin/np-tools.cjs worktree-ff-merge "$SLICE_FULL_ID" 2>&1)
+    FF_STATUS=$?
+    if [ "$FF_STATUS" -ne 0 ]; then
+      echo "[np:execute-phase] ff-merge for $SLICE_FULL_ID failed — worktree left in place for inspection:" >&2
+      echo "  $FF_RESULT" >&2
+      echo "  To resolve: cd into $SLICE_CWD, rebase onto current base, then re-run this workflow." >&2
+      exit "$FF_STATUS"
+    fi
+    node .nubos-pilot/bin/np-tools.cjs worktree-remove "$SLICE_FULL_ID" >/dev/null
+    echo "[np:execute-phase] worktree $SLICE_FULL_ID merged + removed." >&2
+  fi
 done
 
 # Milestone done — regenerate every slice summary so retroactive / resumed

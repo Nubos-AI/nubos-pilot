@@ -5,6 +5,29 @@ const { readState } = require('../../lib/state.cjs');
 const { readCheckpoint, listCheckpoints } = require('../../lib/checkpoint.cjs');
 const { TASK_ID_RE } = require('../../lib/tasks.cjs');
 const textMode = require('../../lib/text-mode.cjs');
+const layout = require('../../lib/layout.cjs');
+const {
+  hasSliceWorktree,
+  sliceWorktreePath,
+  sliceBranchName,
+  worktreeIsolationEnabled,
+  listSliceWorktrees,
+} = require('../../lib/worktree.cjs');
+
+function _worktreeInfoForTask(taskId, cwd) {
+  if (!taskId || !worktreeIsolationEnabled(cwd)) return null;
+  let parsed;
+  try { parsed = layout.parseTaskFullId(taskId); } catch { return null; }
+  const sliceFullId = layout.sliceFullId(parsed.milestone, parsed.slice);
+  let exists = false;
+  try { exists = hasSliceWorktree(sliceFullId, cwd); } catch { exists = false; }
+  if (!exists) return null;
+  return {
+    slice_full_id: sliceFullId,
+    branch: sliceBranchName(sliceFullId),
+    path: sliceWorktreePath(sliceFullId, cwd),
+  };
+}
 
 function _safeReadState(cwd) {
   try { return readState(cwd); } catch { return null; }
@@ -73,6 +96,25 @@ function run(_args, ctx) {
   const tmDetail = textMode.resolveTextModeDetail(cwd);
   payload.text_mode = tmDetail.enabled;
   payload.text_mode_source = tmDetail.source;
+
+  const wtInfo = _worktreeInfoForTask(currentTask, cwd);
+  if (wtInfo) payload.worktree = wtInfo;
+  payload.worktree_isolation = worktreeIsolationEnabled(cwd);
+  let stale = [];
+  try {
+    stale = listSliceWorktrees(cwd).filter((w) => {
+      const b = w.branch;
+      const activeBranch = wtInfo && wtInfo.branch;
+      return b !== activeBranch;
+    });
+  } catch { stale = []; }
+  if (stale.length > 0) {
+    payload.stale_worktrees = stale.map((w) => ({
+      slice_full_id: w.slice_full_id,
+      branch: w.branch,
+      path: w.path,
+    }));
+  }
 
   stdout.write(JSON.stringify(payload));
   return payload;
