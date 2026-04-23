@@ -112,6 +112,38 @@ into the `task(…)` commit. If `workflow.commit_docs=true`, the
 - Auto-discover files via `git status` — the plan declares scope, not the filesystem.
 </scope_guardrail>
 
+## Handoff Protocol
+
+Agent handoffs are persistent notes between phase invocations — context that doesn't belong in commit messages or frontmatter. They survive across spawns and let downstream agents see non-obvious signals you discovered during execution.
+
+**At start, check handoffs addressed to you:**
+
+```bash
+node .nubos-pilot/bin/np-tools.cjs handoff-list --for np-executor --milestone M<NNN> --status open
+```
+
+For each relevant entry:
+1. `node .nubos-pilot/bin/np-tools.cjs handoff-read <id>` — read body
+2. Apply the context to your work
+3. `node .nubos-pilot/bin/np-tools.cjs handoff-status <id> acted`
+
+**At end, write a handoff ONLY for genuine cross-phase signals:**
+
+- Non-obvious compromise the verifier must know about → `--to np-verifier`
+- Plan flaw the next planner run should address → `--to np-planner`
+- Trap in shared code that applies broadly → `--to "*"` (broadcast)
+
+```bash
+node .nubos-pilot/bin/np-tools.cjs handoff-write \
+  --from np-executor \
+  --to np-verifier \
+  --topic "Short subject" \
+  --milestone M<NNN> --slice M<NNN>-S<NNN> --task M<NNN>-S<NNN>-T<NNNN> \
+  --body "What downstream needs to know"
+```
+
+Do NOT write handoffs for routine work. One handoff per genuine signal; noise trains future agents to ignore the channel.
+
 ## Stop Conditions
 
 Hard-stop (report to orchestrator, do not attempt recovery):

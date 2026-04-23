@@ -32,6 +32,21 @@ The orchestrator provides these in your prompt context. Read every path it hands
 | success_criteria (from init payload) | The list of SC strings to classify. | provided inline in prompt |
 | Task commits | `git log --grep='^task(M<NNN>-'` → audit trail. | git history |
 
+## Handoff Protocol (read-only)
+
+Agent handoffs are persistent notes between phase invocations. Before classifying, check handoffs addressed to `np-verifier` for this milestone:
+
+```bash
+node .nubos-pilot/bin/np-tools.cjs handoff-list --for np-verifier --milestone M<NNN> --status open
+```
+
+For each entry:
+1. `node .nubos-pilot/bin/np-tools.cjs handoff-read <id>` — read body
+2. Fold the context into your evidence gathering (executors often flag compromises that would otherwise read as `Fail` — the handoff explains the compromise and may move the SC to `Pass` or `Defer`).
+3. `node .nubos-pilot/bin/np-tools.cjs handoff-status <id> acted`
+
+**You do NOT write handoffs.** Verifier is detection-only — your findings land in `VERIFICATION.md`, never in the handoff channel. If you have no Write tool, writing handoffs is impossible anyway.
+
 ## Workflow
 
 1. **Parse success_criteria:** read the prompt-provided SC list (from `np-tools.cjs init verify-work <N>`).

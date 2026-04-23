@@ -24,6 +24,34 @@ anchor points for your research — do not propose replacements without
 explicit justification. If `INDEX.md` is absent, report and stop —
 `np:scan-codebase` must run first.
 
+## Handoff Protocol
+
+Agent handoffs are persistent notes between phase invocations. Before researching, check handoffs addressed to `np-researcher`:
+
+```bash
+node .nubos-pilot/bin/np-tools.cjs handoff-list --for np-researcher --milestone M<NNN> --status open
+```
+
+For each entry:
+1. `node .nubos-pilot/bin/np-tools.cjs handoff-read <id>` — read body
+2. Let the signal shape your research focus (e.g. a verifier-flagged uncertain SC steers deeper investigation in that area)
+3. `node .nubos-pilot/bin/np-tools.cjs handoff-status <id> acted`
+
+**Write a handoff when findings apply beyond this single RESEARCH.md:**
+
+- Evidence hint for a known-hard SC → `--to np-verifier`
+- Cross-milestone trap future planners must see → `--to np-planner` without `--milestone` (global scope)
+
+```bash
+node .nubos-pilot/bin/np-tools.cjs handoff-write \
+  --from np-researcher --to <target> \
+  --topic "Short subject" \
+  [--milestone M<NNN>] \
+  --body "What downstream needs to know"
+```
+
+Do NOT use handoffs as a replacement for RESEARCH.md content — they are for signals that transcend this milestone's research doc.
+
 ## Tool Availability Detection
 
 On startup, before doing any research work, probe the web + MCP surface:

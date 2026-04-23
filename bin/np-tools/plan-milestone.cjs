@@ -357,6 +357,19 @@ function _scaffoldAllTasks(mNum, cwd) {
   for (const s of slices) {
     per.push(_scaffoldSliceTasks(mNum, s.number, cwd));
   }
+
+  const { renderTodoMd } = require('../../lib/todo.cjs');
+  const todos = [];
+  for (const s of slices) {
+    try {
+      todos.push(renderTodoMd(s.full_id, cwd));
+    } catch (err) {
+      process.stderr.write(
+        '[nubos-pilot warn] TODO.md render failed for ' + s.full_id + ': ' + ((err && err.message) || err) + '\n',
+      );
+    }
+  }
+
   const total = per.reduce((acc, p) => acc + (p.task_count || 0), 0);
   return {
     scaffolded: per,
@@ -364,6 +377,7 @@ function _scaffoldAllTasks(mNum, cwd) {
     milestone: layout.mId(mNum),
     total_tasks: total,
     normalized_ids: normalized.changed ? normalized.remap : {},
+    todos_rendered: todos,
   };
 }
 

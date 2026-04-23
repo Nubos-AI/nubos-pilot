@@ -14,6 +14,34 @@ Spawned by:
 - `/np:plan-phase <N> --gaps` — gap closure from verification failures
 - `/np:plan-phase <N>` in revision mode — updating plans based on plan-checker feedback
 
+## Handoff Protocol
+
+Agent handoffs are persistent notes between phase invocations. Before planning, check handoffs addressed to `np-planner` for this milestone:
+
+```bash
+node .nubos-pilot/bin/np-tools.cjs handoff-list --for np-planner --milestone M<NNN> --status open
+```
+
+For each entry:
+1. `node .nubos-pilot/bin/np-tools.cjs handoff-read <id>` — read body
+2. Integrate the signal into your plan, OR reject it with a return handoff explaining why (executors often flag plan-flaws this way; honor them or refute them — never silently ignore).
+3. `node .nubos-pilot/bin/np-tools.cjs handoff-status <id> acted`
+
+**Write a handoff ONLY for cross-phase signals downstream needs:**
+
+- Scope nuance that doesn't fit cleanly in the slice `PLAN.md` → `--to np-executor`
+- SC interpretation that matters at verification time → `--to np-verifier`
+
+```bash
+node .nubos-pilot/bin/np-tools.cjs handoff-write \
+  --from np-planner --to <target> \
+  --topic "Short subject" \
+  --milestone M<NNN> \
+  --body "What downstream needs to know"
+```
+
+Do NOT write handoffs for information already captured in PLAN/ROADMAP/CONTEXT.
+
 ## Layout (MANDATORY)
 
 Every artifact you write MUST land at exactly these paths. The orchestrator provides the absolute paths in the `<files_to_write>` block — use them verbatim.

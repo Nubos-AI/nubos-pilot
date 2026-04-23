@@ -54,6 +54,11 @@ const COMMANDS = [
   { name: 'phase-meta',        category: 'Planning', description: 'Read roadmap.yaml phase fields as JSON (supports --field NAME and --length for arrays)' },
   { name: 'state-dir',         category: 'Utility',  description: 'Print project-state directory (.nubos-pilot) or a validated subdir via --subdir NAME' },
   { name: 'render-template',   category: 'Utility',  description: 'Render a shipped template by name with --vars JSON (or --vars-file PATH)' },
+  { name: 'render-todo',       category: 'Utility',  description: 'Render slice TODO.md rollup (checkbox view of task statuses) for a slice full-id' },
+  { name: 'handoff-write',     category: 'Capture',  description: 'Write an agent-to-agent handoff note (milestone-scoped by default, global without --milestone)' },
+  { name: 'handoff-read',      category: 'Capture',  description: 'Read a single handoff by id (returns frontmatter + body as JSON)' },
+  { name: 'handoff-list',      category: 'Capture',  description: 'List handoffs (JSON array); filter with --for AGENT, --milestone M<NNN>, --status STATUS, --global' },
+  { name: 'handoff-status',    category: 'Capture',  description: 'Update a handoff status (open|read|acted|archived)' },
   { name: 'thread-resume',     category: 'Utility',  description: 'Bump a thread markdown on resume (status OPEN→IN_PROGRESS, refresh last_resumed) via atomic write' },
   { name: 'state-incr',        category: 'Capture',  description: 'Increment a whitelisted STATE.md counter (e.g. pending_todos) under withFileLock' },
 
