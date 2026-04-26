@@ -189,6 +189,71 @@ test('STATS-2: unknown subcommand prints usage', async () => {
   assert.match(stderr.toString(), /Usage:/);
 });
 
+test('STATS-MD-1: stats markdown emits English title + headers when no config', async () => {
+  const sb = makeSandbox(DEMO_YAML, DEMO_STATE);
+  writeTaskPlan(sb, 1, 1, 1, 'done');
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = await statsCli.run(['markdown'], { cwd: sb, stdout, stderr });
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  const out = stdout.toString();
+  assert.match(out, /^## Project Stats/m);
+  assert.match(out, /^\*\*Milestone:\*\*/m);
+  assert.match(out, /^\*\*Progress:\*\*/m);
+  assert.match(out, /^### Phases/m);
+  assert.match(out, /^### Metrics by Phase/m);
+});
+
+test('STATS-MD-2: stats markdown emits German labels when config.response_language=de', async () => {
+  const sb = makeSandbox(DEMO_YAML, DEMO_STATE);
+  fs.writeFileSync(
+    path.join(sb, '.nubos-pilot', 'config.json'),
+    JSON.stringify({ response_language: 'de' }),
+  );
+  writeTaskPlan(sb, 1, 1, 1, 'done');
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = await statsCli.run(['markdown'], { cwd: sb, stdout, stderr });
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  const out = stdout.toString();
+  assert.match(out, /^## Projekt-Stats/m);
+  assert.match(out, /^\*\*Fortschritt:\*\*/m);
+  assert.match(out, /^\*\*Letzte Aktivität:\*\*/m);
+  assert.match(out, /^\*\*Projekt-Start:\*\*/m);
+  assert.match(out, /^### Phasen/m);
+  assert.match(out, /^### Metriken pro Phase/m);
+  assert.match(out, /Pläne/);
+  assert.equal(/^## Project Stats/m.test(out), false, 'no English title');
+});
+
+test('STATS-MD-3: --lang flag overrides config language', async () => {
+  const sb = makeSandbox(DEMO_YAML, DEMO_STATE);
+  fs.writeFileSync(
+    path.join(sb, '.nubos-pilot', 'config.json'),
+    JSON.stringify({ response_language: 'de' }),
+  );
+  writeTaskPlan(sb, 1, 1, 1, 'done');
+  const stdout = makeSink();
+  const stderr = makeSink();
+  const code = await statsCli.run(['markdown', '--lang', 'en'], { cwd: sb, stdout, stderr });
+  assert.equal(code, 0, 'stderr=' + stderr.toString());
+  assert.match(stdout.toString(), /^## Project Stats/m);
+});
+
+test('STATS-MD-4: _renderMarkdown is a pure function callable without project', () => {
+  const md = statsCli._renderMarkdown({
+    schema_version: 2,
+    milestone: { version: 'v1', name: 'Auth' },
+    phases: [{ number: '1', name: 'F', plans_total: 2, plans_complete: 1, status: 'in-progress' }],
+    plans_total: 2, plans_complete: 1, percent: 50,
+    git: { commits: 5, first_commit_at: '2026-01-01' },
+    last_activity: '2026-04-01T00:00:00Z',
+    metrics_by_phase: {},
+  }, 'de');
+  assert.match(md, /Projekt-Stats/);
+  assert.match(md, /Pläne/);
+});
+
 test('STATS-3: outside project emits NubosPilotError envelope', async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'np-stats-outside-'));
   _sandboxes.push(tmp);

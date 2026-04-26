@@ -6,12 +6,50 @@ const { parseRoadmap } = require('../../lib/roadmap.cjs');
 const { readState } = require('../../lib/state.cjs');
 const { aggregatePhase } = require('../../lib/metrics-aggregate.cjs');
 const { extractFrontmatter } = require('../../lib/frontmatter.cjs');
+const { resolveLanguage } = require('../../lib/language.cjs');
 const layout = require('../../lib/layout.cjs');
 
 const SCHEMA_VERSION = 2;
 
+const MD_LABELS = Object.freeze({
+  en: {
+    title: '## Project Stats',
+    milestone: '**Milestone:**',
+    progress: '**Progress:**',
+    plans: 'plans',
+    last_activity: '**Last activity:**',
+    commits: '**Commits:**',
+    started: '**Project started:**',
+    phases_h: '### Phases',
+    metrics_h: '### Metrics by Phase',
+    cols_phases: '| Phase | Name | Plans | Completed | Status | % |',
+    sep_phases:  '|-------|------|-------|-----------|--------|---|',
+    cols_metrics: '| Phase | Records | Tokens In | Tokens Out | Avg Opus ms | Avg Sonnet ms | Avg Haiku ms | Errors |',
+    sep_metrics:  '|-------|---------|-----------|------------|-------------|---------------|--------------|--------|',
+  },
+  de: {
+    title: '## Projekt-Stats',
+    milestone: '**Milestone:**',
+    progress: '**Fortschritt:**',
+    plans: 'Pläne',
+    last_activity: '**Letzte Aktivität:**',
+    commits: '**Commits:**',
+    started: '**Projekt-Start:**',
+    phases_h: '### Phasen',
+    metrics_h: '### Metriken pro Phase',
+    cols_phases: '| Phase | Name | Pläne | Fertig | Status | % |',
+    sep_phases:  '|-------|------|-------|--------|--------|---|',
+    cols_metrics: '| Phase | Records | Tokens In | Tokens Out | Ø Opus ms | Ø Sonnet ms | Ø Haiku ms | Fehler |',
+    sep_metrics:  '|-------|---------|-----------|------------|-----------|-------------|------------|--------|',
+  },
+});
+
+function _mdLabelsFor(language) {
+  return MD_LABELS[language === 'de' ? 'de' : 'en'];
+}
+
 function _usage() {
-  return 'Usage:\n  np-tools.cjs stats json\n  np-tools.cjs stats bar';
+  return 'Usage:\n  np-tools.cjs stats json\n  np-tools.cjs stats bar\n  np-tools.cjs stats markdown';
 }
 
 function _percent(num, den) {
@@ -181,6 +219,55 @@ async function _buildStats(cwd) {
   };
 }
 
+function _fmt(v) {
+  if (v === null || v === undefined) return '—';
+  if (typeof v === 'number') return v.toLocaleString();
+  return String(v);
+}
+
+function _renderMarkdown(stats, language) {
+  const L = _mdLabelsFor(language);
+  const filled = Math.round((stats.percent || 0) / 5);
+  const bar = '█'.repeat(filled) + '░'.repeat(20 - filled);
+  const lines = [];
+  lines.push(L.title);
+  lines.push('');
+  lines.push(L.milestone + ' ' + _fmt(stats.milestone && stats.milestone.version) + ' — ' + _fmt(stats.milestone && stats.milestone.name));
+  lines.push(L.progress + ' [' + bar + '] ' + (stats.percent || 0) + '% (' + stats.plans_complete + '/' + stats.plans_total + ' ' + L.plans + ')');
+  lines.push(L.last_activity + ' ' + _fmt(stats.last_activity));
+  lines.push(L.commits + ' ' + _fmt(stats.git && stats.git.commits));
+  lines.push(L.started + ' ' + _fmt(stats.git && stats.git.first_commit_at));
+  lines.push('');
+  lines.push(L.phases_h);
+  lines.push('');
+  lines.push(L.cols_phases);
+  lines.push(L.sep_phases);
+  for (const ph of (stats.phases || [])) {
+    const pct = ph.plans_total > 0 ? Math.round(ph.plans_complete / ph.plans_total * 100) : 0;
+    lines.push('| ' + ph.number + ' | ' + ph.name + ' | ' + ph.plans_total + ' | ' + ph.plans_complete + ' | ' + ph.status + ' | ' + pct + '% |');
+  }
+  lines.push('');
+  lines.push(L.metrics_h);
+  lines.push('');
+  lines.push(L.cols_metrics);
+  lines.push(L.sep_metrics);
+  for (const ph of (stats.phases || [])) {
+    const m = (stats.metrics_by_phase || {})[ph.number];
+    if (!m || m.record_count === 0) {
+      lines.push('| ' + ph.number + ' | — | — | — | — | — | — | — |');
+      continue;
+    }
+    const t = m.avg_duration_ms_by_tier || {};
+    lines.push('| ' + ph.number + ' | ' + m.record_count + ' | ' + _fmt(m.total_tokens_in) + ' | ' + _fmt(m.total_tokens_out) + ' | ' + _fmt(t.opus) + ' | ' + _fmt(t.sonnet) + ' | ' + _fmt(t.haiku) + ' | ' + m.error_count + ' |');
+  }
+  return lines.join('\n') + '\n';
+}
+
+function _resolveLangForCwd(cwd) {
+  try { return resolveLanguage(cwd || process.cwd()); }
+  catch { return 'en'; }
+}
+
 async function run(argv, ctx) {
   const context = ctx || {};
   const cwd = context.cwd || process.cwd();
@@ -188,7 +275,7 @@ async function run(argv, ctx) {
   const stderr = context.stderr || process.stderr;
   const args = Array.isArray(argv) ? argv.slice() : [];
   const sub = args.shift();
-  if (sub !== 'json' && sub !== 'bar') {
+  if (sub !== 'json' && sub !== 'bar' && sub !== 'markdown') {
     stderr.write(_usage() + '\n');
     return 1;
   }
@@ -205,6 +292,15 @@ async function run(argv, ctx) {
       stdout.write(_renderBar('Slices', out.slices.percent) + '  (' + out.slices.complete + '/' + out.slices.total + ')\n');
       return 0;
     }
+    if (sub === 'markdown') {
+      let lang = null;
+      const langIdx = args.indexOf('--lang');
+      if (langIdx >= 0 && args[langIdx + 1]) lang = args[langIdx + 1];
+      else for (const a of args) if (a.startsWith('--lang=')) lang = a.slice('--lang='.length);
+      const language = lang || _resolveLangForCwd(cwd);
+      stdout.write(_renderMarkdown(out, language));
+      return 0;
+    }
     stdout.write(JSON.stringify(out, null, 2) + '\n');
     return 0;
   } catch (err) {
@@ -213,7 +309,7 @@ async function run(argv, ctx) {
   }
 }
 
-module.exports = { run, _buildStats, _collectPhases, _milestoneEntry, _collectTaskAndSliceStats, _renderBar };
+module.exports = { run, _buildStats, _collectPhases, _milestoneEntry, _collectTaskAndSliceStats, _renderBar, _renderMarkdown, MD_LABELS };
 
 if (require.main === module) {
   run(process.argv.slice(2)).then((code) => process.exit(code)).catch((err) => {

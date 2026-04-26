@@ -31,6 +31,7 @@ Plan 10-05). Interactive prompts route through
 ## Initialize
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 SCOPE="project"
 TEXT_ARGS=()
 for arg in "$@"; do
@@ -45,6 +46,10 @@ if [[ -z "$TEXT" ]]; then
   exit 2
 fi
 ```
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for the askuser duplicate-resolution
+prompt, all status updates, and the `Note saved …` report block.
 
 The `--global` flag is stripped from anywhere in `$@` (beginning,
 middle, or end of the argv list) before the remaining args are joined

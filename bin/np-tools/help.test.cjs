@@ -1,7 +1,23 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 const helpCmd = require('./help.cjs');
+
+function _sandbox(language) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'np-help-'));
+  fs.mkdirSync(path.join(root, '.nubos-pilot'), { recursive: true });
+  if (language !== undefined) {
+    fs.writeFileSync(
+      path.join(root, '.nubos-pilot', 'config.json'),
+      JSON.stringify({ response_language: language }),
+      'utf-8',
+    );
+  }
+  return root;
+}
 
 test('HELP-CMD-1: run([]) returns rendered text grouped by category with base command names', () => {
   const out = helpCmd.run([]);
@@ -23,5 +39,52 @@ test('HELP-CMD-2: run([--json]) returns { commands: [...] } with all registered 
   for (const c of out.commands) {
     assert.ok(typeof c.category === 'string' && c.category.length > 0);
     assert.ok(typeof c.description === 'string' && c.description.length > 0);
+  }
+});
+
+test('HELP-L1: text render uses German category labels when config.response_language=de', () => {
+  const root = _sandbox('de');
+  try {
+    const out = helpCmd.run([], { cwd: root });
+    assert.match(out.text, /^Werkzeuge\b/m);
+    assert.match(out.text, /^Planung\b/m);
+    assert.match(out.text, /^Ausführung\b/m);
+    assert.equal(/^Utility\b/m.test(out.text), false, 'must not show English category in de mode');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('HELP-L2: text render uses German command descriptions when config language=de', () => {
+  const root = _sandbox('de');
+  try {
+    const out = helpCmd.run([], { cwd: root });
+    assert.match(out.text, /Listet verfügbare Commands auf/);
+    assert.match(out.text, /Gibt aktuellen Projekt-State-Snapshot aus/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('HELP-L3: --json descriptions are localized but category stays canonical English key', () => {
+  const root = _sandbox('de');
+  try {
+    const out = helpCmd.run(['--json'], { cwd: root });
+    const help = out.commands.find((c) => c.name === 'help');
+    assert.equal(help.description, 'Listet verfügbare Commands auf');
+    assert.equal(help.category, 'Utility', 'category stays English so consumers can switch on it');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('HELP-L4: missing config falls back to English', () => {
+  const root = _sandbox();
+  try {
+    const out = helpCmd.run([], { cwd: root });
+    assert.match(out.text, /^Utility\b/m);
+    assert.match(out.text, /List available commands/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
   }
 });

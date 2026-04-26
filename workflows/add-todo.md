@@ -23,6 +23,7 @@ Plan 10-05). All interactive prompts route through
 ## Initialize
 
 ```bash
+LANG_DIRECTIVE=$(node .nubos-pilot/bin/np-tools.cjs lang-directive)
 DESCRIPTION="$*"
 if [[ -z "$DESCRIPTION" ]]; then
   echo "Usage: /np:add-todo <description>" >&2
@@ -46,6 +47,10 @@ Extract from init JSON: `commit_docs`, `date`, `timestamp`, `slug`,
 through `lib/layout.cjs.slugify` (strips to `[a-z0-9-]` only;
 filename-injection mitigation) and validates the description length
 (<= 500 chars) before any filesystem write occurs.
+
+**Language (SSOT = `.nubos-pilot/config.json` → `response_language`).**
+`$LANG_DIRECTIVE` is authoritative. Obey it for all askuser prompt texts,
+status updates, and the final report block.
 
 **Askuser routing.** Every `node .nubos-pilot/bin/np-tools.cjs askuser …` block below is a spec, not a literal command. Pick the path once at Initialize:
 - **Claude Code** (native `AskUserQuestion` tool is available): parse the JSON spec and call `AskUserQuestion` directly. `select` → `multiSelect: false`; `multiselect` → `multiSelect: true`; `confirm` → `options: [{label: "Yes"}, {label: "No"}]`; `input` → ask free-form in chat. Use a short `header` (≤12 chars).

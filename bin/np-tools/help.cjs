@@ -1,6 +1,7 @@
-const { COMMANDS } = require('./_commands.cjs');
+const { COMMANDS, localizedCommands, categoryLabel } = require('./_commands.cjs');
+const { resolveLanguage } = require('../../lib/language.cjs');
 
-function _renderText(commands) {
+function _renderText(commands, language) {
   const byCat = new Map();
   for (const c of commands) {
     if (!byCat.has(c.category)) byCat.set(c.category, []);
@@ -8,7 +9,7 @@ function _renderText(commands) {
   }
   const lines = [];
   for (const [cat, items] of byCat) {
-    lines.push(cat);
+    lines.push(categoryLabel(cat, language));
     for (const c of items) {
       lines.push('  ' + c.name.padEnd(10) + c.description);
     }
@@ -17,12 +18,20 @@ function _renderText(commands) {
   return lines.join('\n').replace(/\n+$/, '\n');
 }
 
-function run(args) {
-  const list = Array.isArray(args) ? args : [];
-  if (list.includes('--json')) {
-    return { commands: COMMANDS.slice() };
-  }
-  return { text: _renderText(COMMANDS) };
+function _resolveLangForCwd(cwd) {
+  try { return resolveLanguage(cwd || process.cwd()); }
+  catch { return 'en'; }
 }
 
-module.exports = { run };
+function run(args, ctx) {
+  const list = Array.isArray(args) ? args : [];
+  const cwd = (ctx && ctx.cwd) || process.cwd();
+  const language = _resolveLangForCwd(cwd);
+  const cmds = localizedCommands(language);
+  if (list.includes('--json')) {
+    return { commands: cmds };
+  }
+  return { text: _renderText(cmds, language) };
+}
+
+module.exports = { run, _renderText };
