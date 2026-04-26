@@ -63,7 +63,7 @@ const COMMANDS = [
   { name: 'worktree-remove',   category: 'Execution', description: 'Remove a slice worktree + delete its branch (--force / --keep-branch)' },
   { name: 'worktree-list',     category: 'Execution', description: 'List all nubos-pilot-managed slice worktrees (np/<mid>-<sid> only) as JSON' },
   { name: 'worktree-ff-merge', category: 'Execution', description: 'Fast-forward merge a slice branch back to its base (fails hard on non-FF)' },
-  { name: 'dashboard',         category: 'Utility',   description: 'One-shot console dashboard of milestones/slices/handoffs/worktrees (--json, --no-color, --watch [seconds])' },
+  { name: 'dashboard',         category: 'Utility',   description: 'One-shot console dashboard of milestones, slices, and tasks. Read-only; flags: --json, --no-color' },
   { name: 'thread-resume',     category: 'Utility',  description: 'Bump a thread markdown on resume (status OPEN→IN_PROGRESS, refresh last_resumed) via atomic write' },
   { name: 'state-incr',        category: 'Capture',  description: 'Increment a whitelisted STATE.md counter (e.g. pending_todos) under withFileLock' },
 
