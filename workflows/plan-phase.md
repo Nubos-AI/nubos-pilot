@@ -205,6 +205,18 @@ esac
 - Write task files directly — the planner writes slice plans; the scaffolder writes task files.
 - Invoke host-specific prompt tools directly. Always `np-tools.cjs askuser --json …`.
 
+## Skills (Nubos library)
+
+Before iteration 1, decide whether to pressure-test the planner output with the **`np-council`** skill (`.claude/skills/np-council/SKILL.md`). Trigger the skill on Claude Code when the plan-checker verdict at iteration 1 is `passed` BUT any of the following holds:
+
+- Milestone touches public-facing UX, payments, auth, or data-migration.
+- `>= 4` slices OR `>= 12` tasks (cross-slice dep risk).
+- Goal contains a hard tradeoff ("vs", "instead of", "decide between") that the planner resolved unilaterally.
+
+If triggered, the council pressure-tests the slice-decomposition + execution order before scaffolding. On dissent, re-enter iteration 2 with the council's findings appended to `LAST_FINDINGS`. On consensus, scaffold normally.
+
+For non-UX, low-risk plans (≤ 3 slices, internal tooling, refactors with test coverage), skip — the 2-iteration plan-checker loop is sufficient.
+
 ## Verification Loop
 
 ```bash

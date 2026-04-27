@@ -26,6 +26,7 @@
     "templates/",
     "workflows/",
     "agents/",
+    "skills/",
     "docs/",
     "np-tools.cjs",
     "README.md"

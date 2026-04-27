@@ -36,6 +36,18 @@ Parse: `milestone`, `milestone_id`, `milestone_dir`, `milestone_name`, `success_
 - **`text_mode == true`** (INIT payload): skip every askuser block and render questions as plain-text numbered lists. Opt-in via `.nubos-pilot/config.json` → `workflow.text_mode`.
 - **Other runtime with TTY** (Codex, Gemini, …): execute the shell `askuser` block verbatim.
 
+## Skills (Nubos library)
+
+For UI/UX-flavoured success criteria, instruct the verifier (in its spawn prompt) to load the matching Nubos skill before classifying:
+
+| SC type | Skill to use |
+|---|---|
+| Visual polish, layout, hierarchy, motion | `np-impeccable` (`.claude/skills/np-impeccable/SKILL.md`) |
+| Accessibility, semantic HTML, UX heuristics | `np-web-design-guidelines` |
+| Component architecture, design-system fit | `np-design` |
+
+For borderline Pass/Fail calls in Pass 2 (deterministic evidence inconclusive **and** the SC carries real consequences), pressure-test with **`np-council`** before flipping `needs_user_confirm` → `Pass`/`Fail`. Backend/infra/data SCs do not need any skill — verdict on evidence alone.
+
 ## Pass 1 — verifier agent
 
 Spawn `agents/np-verifier.md` (tier: sonnet, READ-ONLY tools) with:

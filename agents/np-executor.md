@@ -20,6 +20,7 @@ If the prompt contains a `<files_to_read>` block, you MUST use the `Read` tool t
 - Invoke commit-helper ONLY after verification passes.
 - Never invoke `git` directly — always through the `np-tools.cjs` wrapper so the D-25 gitignore-guard runs.
 - One task per spawn. One commit per task (D-03).
+- If the spawn prompt contains a `Use the following Nubos skills:` line (injected by `/np:execute-phase` for UI/frontend tasks), load each named skill from `.claude/skills/<skill>/SKILL.md` BEFORE editing source. Apply each skill's quality bar; verification must pass against the skill's rules, not just the test command.
 </role>
 
 ## Inputs

@@ -58,6 +58,7 @@ const SOURCE_OPENCODE_DIR = path.join(__dirname, '..', 'templates', 'opencode', 
 const OPENCODE_JSON_TEMPLATE = path.join(__dirname, '..', 'templates', 'opencode', 'opencode.json');
 const SOURCE_WORKFLOWS_DIR = path.join(__dirname, '..', 'workflows');
 const SOURCE_AGENTS_DIR = path.join(__dirname, '..', 'agents');
+const SOURCE_SKILLS_DIR = path.join(__dirname, '..', 'skills');
 
 function _autoAskUser(spec) {
   return Promise.resolve({
@@ -382,6 +383,7 @@ async function _runInstallLocked(ctx) {
     projectRoot,
     workflowsDir: SOURCE_WORKFLOWS_DIR,
     agentsDir: SOURCE_AGENTS_DIR,
+    skillsDir: SOURCE_SKILLS_DIR,
   });
   const assetEntries = runtimeAssetsMod.manifestEntriesForPlans(assetPlans);
   for (const k of Object.keys(assetEntries)) {

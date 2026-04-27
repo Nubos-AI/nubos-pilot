@@ -245,6 +245,8 @@ For each selected area, ask 2–4 focused questions. Every prompt routes
 through `np-tools.cjs askuser` — never through the runtime-native structured
 question tool directly (SC-5 enforcement from Phase 3).
 
+**Skill trigger — `np-council` (`.claude/skills/np-council/SKILL.md`).** When an area surfaces a real decision with stakes (multiple valid options, irreversible-ish, user explicitly torn or asks "what would you do"), pressure-test with the council skill **before** writing the decision into CONTEXT.md. Capture the council's verdict + dissents into the area's decision text — downstream planner reads them. Skip the council for trivial picks (e.g. "tabs vs spaces in copy", icon library choice with no real tradeoff) — it adds noise.
+
 Per area, the recommended flow is:
 
 ```bash

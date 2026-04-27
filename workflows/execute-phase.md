@@ -40,6 +40,33 @@ Parse JSON for: `milestone`, `milestone_id`, `milestone_dir`, `waves[]` (each wi
 
 `PLAN_ID` is iterated per slice as `${milestone_id}-${slice_id}` (e.g. `M001-S001`). `TASK_ID` is iterated from each slice's `tasks[]` (e.g. `M001-S001-T0001`).
 
+## Skills (Nubos library)
+
+Nubos ships a skill library under `.claude/skills/np-*/` (auto-installed by `npx nubos-pilot`, present only on Claude Code). For each task in a wave, before spawning `np-executor`, classify the task by reading its `T<NNNN>-PLAN.md` and inject the matching skill triggers into the executor's spawn prompt as a "Use these skills" directive. The executor then loads each skill's `SKILL.md` via the runtime's skill mechanism and follows its rules during implementation.
+
+Mapping (match the dominant signal in `files_modified` + task description):
+
+| Task signal | Skills to trigger |
+|---|---|
+| Any UI/component edit (`.tsx`, `.jsx`, `.vue`, `.svelte`, `views/**`, `components/**`, `pages/**`, `app/**`) | `np-impeccable` (polish/audit), `np-frontend-design` (build), `np-design` (review), `np-web-design-guidelines` (a11y/UX) |
+| `components.json` present in repo OR shadcn/ui imports in modified files | `np-shadcn` (in addition to UI skills above) |
+| React/Next.js component or hook edit | `np-react-best-practices`, `np-composition-patterns` |
+| Page/route transitions, `<ViewTransition>`, `startViewTransition` | `np-react-view-transitions` |
+| React Native / Expo source (`*.tsx` under `app/`, `screens/`, `mobile/**`) | `np-react-native-skills` |
+| Restyling an existing surface (no greenfield) | `np-redesign-existing-projects` |
+| New surface needing visual direction | Pick exactly **one** style anchor: `np-high-end-visual-design` (default agency premium), `np-minimalist-ui`, `np-industrial-brutalist-ui`, or `np-stitch-design-taste` |
+| Non-UI task (backend, infra, tooling, docs) | None — skip the skill block entirely |
+
+**Spawn-prompt injection format.** Append to the executor prompt verbatim (one line per matched skill):
+
+```
+Use the following Nubos skills for this task: <skill-1>, <skill-2>, ...
+Each skill is installed at .claude/skills/<skill>/SKILL.md and encodes a
+quality bar you must satisfy before invoking commit-task.
+```
+
+If zero skills match, omit the block — do **not** invent skills. Adding new skills under `skills/np-*/` in the source repo is sufficient: the next `npx nubos-pilot update` rolls them out and you extend this mapping in one PR.
+
 ## Pre-Flight — orphan-checkpoint guard
 
 Detect stale checkpoints from a prior run before starting new work:
