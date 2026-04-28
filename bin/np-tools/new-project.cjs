@@ -177,6 +177,14 @@ function _apply(answersPath, cwd, stdout) {
     _render(_loadTemplate('REQUIREMENTS'), reqVars, 'REQUIREMENTS'),
   );
 
+  atomicWriteFileSync(
+    path.join(stateDir, 'RULES.md'),
+    _render(_loadTemplate('RULES'), {
+      project_name: answers.project_name,
+      created_date: createdDate,
+    }, 'RULES'),
+  );
+
   layout.createMilestoneDir(firstMilestoneNumber, root);
   const msTemplatesDir = path.join(TEMPLATES_DIR, 'milestone');
   const msCtx = _render(
@@ -261,6 +269,7 @@ function _apply(answersPath, cwd, stdout) {
     created: [
       '.nubos-pilot/PROJECT.md',
       '.nubos-pilot/REQUIREMENTS.md',
+      '.nubos-pilot/RULES.md',
       '.nubos-pilot/roadmap.yaml',
       '.nubos-pilot/STATE.md',
       path.relative(root, layout.milestoneContextPath(firstMilestoneNumber, root)),

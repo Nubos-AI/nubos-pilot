@@ -39,7 +39,6 @@ const COMMANDS = [
 
   { name: 'add-todo',            category: 'Capture', description: 'Capture a pending todo to .nubos-pilot/todos/pending/ + increment STATE count', description_de: 'Erfasst pending Todo nach .nubos-pilot/todos/pending/ + erhöht STATE-Counter' },
   { name: 'note',                category: 'Capture', description: 'Capture a free-form note (project default, --global writes to ~/.nubos-pilot/notes/)', description_de: 'Erfasst freiformige Notiz (Projekt-Default, --global schreibt nach ~/.nubos-pilot/notes/)' },
-  { name: 'add-backlog',         category: 'Capture', description: 'Append backlog item to ROADMAP.md', description_de: 'Hängt Backlog-Eintrag an ROADMAP.md an' },
 
   { name: 'askuser',         category: 'Utility', description: 'Capability-layer prompt wrapper (reads spec JSON, returns chosen label)', description_de: 'Capability-Layer-Prompt-Wrapper (liest Spec-JSON, gibt gewähltes Label zurück)' },
   { name: 'commit',          category: 'Utility', description: 'Atomic git commit wrapper with gitignore-guard', description_de: 'Atomarer Git-Commit-Wrapper mit Gitignore-Guard' },
@@ -71,7 +70,13 @@ const COMMANDS = [
   { name: 'session-aggregate',     category: 'Utility', description: 'Aggregate session metrics under withFileLock; reads pointer .last-session unless --since overrides', description_de: 'Aggregiert Session-Metriken unter withFileLock; liest Pointer .last-session, außer --since überschreibt' },
   { name: 'session-pointer-write', category: 'Utility', description: 'Atomic write of .nubos-pilot/reports/.last-session under withFileLock (ISO-8601 UTC)', description_de: 'Atomares Schreiben von .nubos-pilot/reports/.last-session unter withFileLock (ISO-8601 UTC)' },
   { name: 'workspace-scan',        category: 'Install', description: 'Scan a workspace and emit inventory JSON (full result or --summary shape for /np:new-project)', description_de: 'Scannt einen Workspace und liefert Inventar-JSON (volles Ergebnis oder --summary-Shape für /np:new-project)' },
-  { name: 'cleanup',          category: 'Utility', description: 'Archive completed milestones to .nubos-pilot/archive/v<X.Y>/', description_de: 'Archiviert abgeschlossene Milestones nach .nubos-pilot/archive/v<X.Y>/' },
+
+  { name: 'knowledge-index',         category: 'Utility', description: 'Build BM25-light index over .nubos-pilot/**/*.md → .nubos-pilot/state/knowledge-index.json', description_de: 'Baut BM25-Light-Index über .nubos-pilot/**/*.md → .nubos-pilot/state/knowledge-index.json' },
+  { name: 'knowledge-search',        category: 'Utility', description: 'Query the knowledge index; returns top-N JSON hits (rel_path + lines + score + preview)', description_de: 'Sucht im Knowledge-Index; liefert Top-N-JSON-Treffer (rel_path + Zeilen + Score + Preview)' },
+  { name: 'knowledge-stats',         category: 'Utility', description: 'Print knowledge-index size + grouping (auto-builds if missing)', description_de: 'Gibt Knowledge-Index-Größe + Gruppierung aus (baut auto bei Fehlen)' },
+  { name: 'context-stats',           category: 'Utility', description: 'Aggregated context-budget stats (file counts + bytes per group, knowledge-index size)', description_de: 'Aggregierte Context-Budget-Stats (Dateien/Bytes pro Gruppe, Knowledge-Index-Größe)' },
+  { name: 'session-snapshot-write',  category: 'Utility', description: 'Capture session snapshot (current_task + recent commits + open handoffs) for resume', description_de: 'Erfasst Session-Snapshot (current_task + letzte Commits + offene Handoffs) für Resume' },
+  { name: 'session-snapshot-read',   category: 'Utility', description: 'Print last session snapshot as JSON', description_de: 'Gibt letzten Session-Snapshot als JSON aus' },
 ];
 
 const CATEGORY_LABELS = Object.freeze({

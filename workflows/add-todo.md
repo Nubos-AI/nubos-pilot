@@ -166,7 +166,6 @@ Todo saved: $TODO_PATH
   Created: $TIMESTAMP
 
 Pending todo count bumped via lib/state.cjs.mutateState.
-Use /np:next to surface this todo in the next-step picker.
 ```
 
 ## Scope Guardrail
@@ -227,7 +226,5 @@ Use /np:next to surface this todo in the next-step picker.
 
 - **`/np:note <text>`** — zero-friction free-form capture (no STATE
   mutation, no todo semantics). Use when the idea isn't yet actionable.
-- **`/np:add-backlog <title>`** — larger-scope capture for ideas that
-  deserve a full backlog phase (`999.x` in ROADMAP.md).
-- **`/np:next`** — surfaces the next actionable item; a pending todo
-  can be the pointer when no active plan has a runnable task.
+- **`/np:thread <slug>`** — cross-session thread for an idea that
+  needs to persist across host CLI restarts.

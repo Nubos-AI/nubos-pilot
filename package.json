@@ -28,6 +28,7 @@
     "agents/",
     "skills/",
     "docs/",
+    "mcp-configs/",
     "np-tools.cjs",
     "README.md"
   ],

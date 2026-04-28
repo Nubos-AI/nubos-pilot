@@ -316,8 +316,9 @@ Canonical tokens this workflow uses:
 | Milestone directory root      | `.nubos-pilot/milestones/…`  |
 | Claude-Code `Task(…)` spawn   | abstract `Spawn agent=…`     |
 
-Auto-advance state lives on `workflow.auto_advance` (boolean). Set
-from `/np:autonomous`; cleared when the loop exits or the user aborts.
+Auto-advance state lives on `workflow.auto_advance` (boolean) in
+`.nubos-pilot/config.json`. Orchestrators set or clear it directly —
+there is no `/np:autonomous` slash-command today.
 
 ## Exit Codes
 

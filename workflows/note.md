@@ -249,8 +249,8 @@ Note saved ($SCOPE): $NOTE_PATH
 
 - **`/np:add-todo <title>`** — pending todo capture with STATE.md
   counter increment. Use when the idea is actionable.
-- **`/np:add-backlog <title>`** — larger-scope capture for a full
-  backlog phase (`999.x`) entry in ROADMAP.md.
+- **`/np:thread <slug>`** — cross-session thread for an idea that
+  needs to persist across host CLI restarts.
 
 ## Design Notes
 

@@ -182,7 +182,6 @@ Echo `Thread <MODE>d: <THREAD_PATH>` with slug/mode/today to stdout.
 
 - **`/np:add-todo <title>`** — smaller-scope pending todo capture.
 - **`/np:note [--global] <text>`** — zero-friction free-form capture.
-- **`/np:add-backlog <title>`** — promote a thread to a backlog entry.
 
 ## Design Notes
 

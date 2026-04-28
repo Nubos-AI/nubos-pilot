@@ -96,7 +96,8 @@ and is rendered by the agent CLI.
 
 ## Related Workflows
 
-- **`/np:progress`** — base-workflow percent snapshot (subset).
+- **`/np:dashboard`** — read-only milestone/slice/task overview with
+  per-status counts and checkbox rollups.
 - **`/np:session-report`** — commits a rendered report with
   since-last-session metrics (the producer pair for `/np:stats`).
 

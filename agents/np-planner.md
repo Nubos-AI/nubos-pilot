@@ -303,7 +303,7 @@ The cross-slice dep `M001-S001-T0001` flows forward (S001 → S002); the new tas
 ## Tooling Conventions (Phase-5 locked)
 
 - Workflows and agents invoke the helper as `node np-tools.cjs <subcommand> …` (D-03).
-- Auto-advance flag is `workflow.auto_advance` (boolean) — set by `/np:autonomous`, cleared on exit/abort.
+- Auto-advance flag is `workflow.auto_advance` (boolean) in `.nubos-pilot/config.json`; orchestrators set/clear it directly. There is no `/np:autonomous` slash-command today.
 - AskUserQuestion calls in workflow MD bodies use the helper form:
   ```bash
   CHOICE=$(node np-tools.cjs askuser --json '{"type":"select","question":"…","options":[…]}')

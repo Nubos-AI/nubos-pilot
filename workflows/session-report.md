@@ -232,8 +232,6 @@ Session report: $REPORT_PATH
 ## Related Workflows
 
 - **`/np:stats`** — stats snapshot (read-only, no pointer, no commit).
-- **`/np:cleanup`** — archive completed milestones (distinct
-  milestone-level aggregation).
 
 ## Design Notes
 

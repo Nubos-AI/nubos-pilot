@@ -1,0 +1,17 @@
+# Reference shape for ~/.codex/config.toml — copy the [mcp_servers.*]
+# blocks you want into your existing config. nubos-pilot does NOT manage
+# this file; wire it up per host.
+
+[mcp_servers.context7]
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+[mcp_servers.firecrawl]
+command = "npx"
+args = ["-y", "firecrawl-mcp"]
+env = { FIRECRAWL_API_KEY = "${FIRECRAWL_API_KEY}" }
+
+[mcp_servers.exa]
+command = "npx"
+args = ["-y", "exa-mcp-server"]
+env = { EXA_API_KEY = "${EXA_API_KEY}" }

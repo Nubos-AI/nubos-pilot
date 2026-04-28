@@ -69,6 +69,12 @@ const topLevelCommands = {
   'session-aggregate':     require('./bin/np-tools/session-aggregate.cjs'),
   'session-pointer-write': require('./bin/np-tools/session-pointer-write.cjs'),
   'workspace-scan': require('./bin/np-tools/workspace-scan.cjs'),
+  'knowledge-index':  require('./bin/np-tools/knowledge-index.cjs'),
+  'knowledge-search': require('./bin/np-tools/knowledge-search.cjs'),
+  'knowledge-stats':  require('./bin/np-tools/knowledge-stats.cjs'),
+  'context-stats':    require('./bin/np-tools/context-stats.cjs'),
+  'session-snapshot-write': require('./bin/np-tools/session-snapshot-write.cjs'),
+  'session-snapshot-read':  require('./bin/np-tools/session-snapshot-read.cjs'),
 };
 
 const THRESHOLD = 16 * 1024;

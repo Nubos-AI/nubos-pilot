@@ -1,0 +1,27 @@
+{
+  "_comment_": "Reference shape for Claude Code .mcp.json (project-local) or ~/.claude.json. Copy the entries you want under your existing 'mcpServers' key. nubos-pilot does NOT manage this file — wire up per host.",
+  "mcpServers": {
+    "context7": {
+      "_comment_": "Library docs lookup. np-researcher probes this at spawn. Disable by removing the entry — researcher falls back to local-only with a Research Coverage section.",
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {}
+    },
+    "firecrawl": {
+      "_comment_": "Web scraping for research-phase. Optional — researcher works without it.",
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      }
+    },
+    "exa": {
+      "_comment_": "Semantic web search. Optional — researcher works without it.",
+      "command": "npx",
+      "args": ["-y", "exa-mcp-server"],
+      "env": {
+        "EXA_API_KEY": "${EXA_API_KEY}"
+      }
+    }
+  }
+}

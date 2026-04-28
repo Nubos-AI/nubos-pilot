@@ -6,6 +6,7 @@ const { readCheckpoint, listCheckpoints } = require('../../lib/checkpoint.cjs');
 const { TASK_ID_RE } = require('../../lib/tasks.cjs');
 const textMode = require('../../lib/text-mode.cjs');
 const layout = require('../../lib/layout.cjs');
+const { readSnapshot } = require('../../lib/session-snapshot.cjs');
 const {
   hasSliceWorktree,
   sliceWorktreePath,
@@ -114,6 +115,17 @@ function run(_args, ctx) {
       branch: w.branch,
       path: w.path,
     }));
+  }
+
+  const snap = readSnapshot(cwd);
+  if (snap) {
+    payload.session_snapshot = {
+      captured_at: snap.captured_at,
+      milestone: snap.milestone,
+      current_task: snap.current_task,
+      last_commits: (snap.last_commits || []).slice(0, 5),
+      open_handoffs: snap.open_handoffs || [],
+    };
   }
 
   stdout.write(JSON.stringify(payload));
