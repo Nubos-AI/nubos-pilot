@@ -36,6 +36,8 @@
     "test": "node --test 'lib/**/*.test.cjs' 'tests/**/*.test.cjs' 'bin/**/*.test.cjs'",
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='lib/**' 'lib/**/*.test.cjs' 'tests/**/*.test.cjs' 'bin/**/*.test.cjs'",
     "check-coverage": "node bin/check-coverage.cjs",
+    "docs:generate": "node scripts/generate-docs.cjs",
+    "docs:check": "node scripts/generate-docs.cjs --check",
     "ci": "npm run test && npm run check-coverage"
   }
 }

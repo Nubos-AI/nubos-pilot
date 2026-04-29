@@ -1,6 +1,6 @@
 # nubos-pilot
 
-AI-driven planning and execution tool for code projects. Installs into Claude Code, Codex, Gemini, OpenCode, Cursor and 10+ other host CLIs as a set of Markdown workflows + subagents.
+AI-driven planning and execution tool for code projects. Installs into 14 host CLIs (Claude Code, Codex, Gemini, OpenCode, Cursor and ten more) as a set of Markdown workflows + subagents.
 
 - **No daemon.** Every command runs as a short-lived `node` invocation.
 - **Markdown-first.** Workflows and agents are plain `.md` files — the host reads them directly.
@@ -11,8 +11,12 @@ AI-driven planning and execution tool for code projects. Installs into Claude Co
 
 ```bash
 cd your-project/
-npx nubos-pilot install --agent claude    # or: codex | gemini | opencode | cursor | …
+npx nubos-pilot                                 # interactive: pick runtime(s) + scope + model profile
+npx nubos-pilot --agent claude                  # non-interactive single runtime
+npx nubos-pilot --agents claude,codex,cursor    # multi-runtime install
 ```
+
+Supported `--agent` values: `claude`, `antigravity`, `augment`, `cline`, `codebuddy`, `codex`, `copilot`, `cursor`, `gemini`, `kilo`, `opencode`, `qwen`, `trae`, `windsurf`. Other top-level subcommands: `update`, `uninstall`, `doctor`, `install-hooks`, `uninstall-hooks`, plus `--dry-run`.
 
 This writes a self-contained payload under `.claude/nubos-pilot/` (or the host-specific equivalent), plus a managed block in `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`. Uninstall with `npx nubos-pilot uninstall`.
 
@@ -91,29 +95,25 @@ task(M001-S001-T0002): wire login handler
 
 ## Agents
 
-Seven subagents are installed into the host's agent directory:
+Eleven subagents are installed into the host's agent directory:
 
 - `np-planner` (opus) — breaks a milestone into slices + tasks
 - `np-plan-checker` (opus) — adversarial goal-backward review before execution
+- `np-architect` (sonnet) — optional ADR-style decisions before planning
+- `np-researcher` (sonnet) — milestone-level stack + pitfalls research
+- `np-sc-extractor` (haiku) — derives observable Success Criteria from goal + CONTEXT
+- `np-codebase-documenter` (sonnet) — maintains `.nubos-pilot/codebase/` module docs
 - `np-executor` (sonnet) — one task per spawn, one commit per task
+- `np-build-fixer` (sonnet) — recovery patcher for executor verify failures (manual spawn)
 - `np-verifier` (sonnet) — post-execution Pass/Fail/Defer per success_criterion
 - `np-nyquist-auditor` (haiku) — requirement test-coverage audit
-- `np-researcher` (sonnet) — milestone-level stack + pitfalls research
-- `np-codebase-documenter` (sonnet) — maintains `.nubos-pilot/codebase/` module docs
+- `np-security-reviewer` (sonnet) — OWASP-aligned read-only audit (manual spawn)
 
 Every spawn runs with an **explicit tier** (`haiku` / `sonnet` / `opus`) resolved to a concrete model via `np-tools.cjs resolve-model --profile <frontier|quality|balanced|budget|inherit>`.
 
 ## Model profile
 
-| Profile | haiku → | sonnet → | opus → |
-|---|---|---|---|
-| `frontier` | opus | opus | opus |
-| `quality` | sonnet | sonnet | opus |
-| `balanced` | haiku | sonnet | opus |
-| `budget` | haiku | haiku | sonnet |
-| `inherit` | *(runtime default)* | | |
-
-Set at install time (`Model-Profile?` prompt) or in `.nubos-pilot/config.json`.
+Five profiles (`frontier`, `quality`, `balanced`, `budget`, `inherit`) map each tier (`haiku` / `sonnet` / `opus`) to a concrete model. Set at install time (`Model-Profile?` prompt) or in `.nubos-pilot/config.json`. Full matrix in `docs/agent-frontmatter-schema.md`.
 
 ## Requirements
 
