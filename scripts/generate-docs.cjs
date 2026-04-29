@@ -13,6 +13,13 @@ const { RUNTIMES } = require(path.join(SOURCE_ROOT, 'lib', 'install', 'runtimes-
 
 const FIRST_CLASS_RUNTIMES = new Set(['claude', 'codex', 'gemini', 'opencode']);
 
+function escapeMd(s) {
+  return String(s)
+    .replace(/\|/g, '\\|')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 function loadAgents() {
   const dir = path.join(SOURCE_ROOT, 'agents');
   return fs.readdirSync(dir)
@@ -24,8 +31,8 @@ function loadAgents() {
       return {
         name: frontmatter.name || file.replace(/\.md$/, ''),
         tier: frontmatter.tier || '',
-        tools: frontmatter.tools || '',
-        description: (frontmatter.description || '').replace(/\|/g, '\\|'),
+        tools: escapeMd(frontmatter.tools || ''),
+        description: escapeMd(frontmatter.description || ''),
       };
     });
 }
@@ -98,8 +105,7 @@ function renderCliCommands(commands) {
     out.push('| Command | Description |');
     out.push('|---|---|');
     for (const c of list.slice().sort((a, b) => a.name.localeCompare(b.name))) {
-      const desc = (c.description || '').replace(/\|/g, '\\|');
-      out.push(`| \`${c.name}\` | ${desc} |`);
+      out.push(`| \`${c.name}\` | ${escapeMd(c.description || '')} |`);
     }
     out.push('');
   }
