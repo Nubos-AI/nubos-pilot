@@ -1,0 +1,111 @@
+const { test, after } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { execFileSync } = require('node:child_process');
+
+const subcmd = require('./resume-work.cjs');
+const { startTask, listCheckpoints } = require('../../lib/checkpoint.cjs');
+
+const _roots = [];
+
+function makeRoot(currentTask) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'np-rw-'));
+  fs.mkdirSync(path.join(root, '.nubos-pilot'), { recursive: true });
+  const ct = currentTask == null ? 'null' : currentTask;
+  fs.writeFileSync(path.join(root, '.nubos-pilot', 'STATE.md'), `---
+schema_version: 2
+milestone: m1
+milestone_name: m1
+current_phase: 6
+current_plan: "06-01"
+current_task: ${ct}
+last_updated: "2026-04-15T00:00:00Z"
+progress:
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+session:
+  stopped_at: null
+  resume_file: null
+  last_activity: null
+---
+
+# State
+`, 'utf-8');
+  _roots.push(root);
+  return root;
+}
+
+function _capture() { let b = ''; return { stub: { write: (s) => { b += s; return true; } }, get: () => b }; }
+
+after(() => {
+  while (_roots.length) {
+    const r = _roots.pop();
+    try { fs.rmSync(r, { recursive: true, force: true }); } catch {}
+  }
+});
+
+test('RW-1: clean when no state, no checkpoints', () => {
+  const root = makeRoot(null);
+  const cap = _capture();
+  const p = subcmd.run([], { cwd: root, stdout: cap.stub });
+  assert.equal(p.status, 'clean');
+});
+
+test('RW-2: resume when current_task matches an in-progress checkpoint', () => {
+  const root = makeRoot('M006-S001-T0001');
+  startTask({ id: 'M006-S001-T0001', phase: 6, plan: '06-01', wave: 1 }, root);
+  const cap = _capture();
+  const p = subcmd.run([], { cwd: root, stdout: cap.stub });
+  assert.equal(p.status, 'resume');
+  assert.equal(p.task_id, 'M006-S001-T0001');
+  assert.equal(p.checkpoint.status, 'in-progress');
+});
+
+test('RW-3: orphan when checkpoint files exist but no matching STATE.current_task', () => {
+  const root = makeRoot(null);
+  startTask({ id: 'M006-S001-T0005', phase: 6, plan: '06-01', wave: 1 }, root);
+
+  const statePath = path.join(root, '.nubos-pilot', 'STATE.md');
+  const body = fs.readFileSync(statePath, 'utf-8').replace(/current_task:.*/, 'current_task: null');
+  fs.writeFileSync(statePath, body, 'utf-8');
+  const cap = _capture();
+  const p = subcmd.run([], { cwd: root, stdout: cap.stub });
+  assert.equal(p.status, 'orphan');
+  assert.ok(p.checkpoint_ids.includes('M006-S001-T0005'));
+});
+
+test('RW-5: committed orphan is reconciled against git and pruned (not surfaced)', () => {
+  const root = makeRoot(null);
+  execFileSync('git', ['init', '-q', '-b', 'main', root], { stdio: 'pipe' });
+  execFileSync('git', ['-C', root, 'config', 'user.email', 'test@nubos.local']);
+  execFileSync('git', ['-C', root, 'config', 'user.name', 'nubos-test']);
+  execFileSync('git', ['-C', root, 'commit', '--allow-empty', '-q', '-m', 'chore: init'], { stdio: 'pipe' });
+  startTask({ id: 'M013-S005-T0002', phase: 6, plan: '06-01', wave: 1 }, root);
+  execFileSync('git', ['-C', root, 'commit', '--allow-empty', '-q', '-m', 'task(M013-S005-T0002): demo'], { stdio: 'pipe' });
+  const statePath = path.join(root, '.nubos-pilot', 'STATE.md');
+  fs.writeFileSync(statePath, fs.readFileSync(statePath, 'utf-8').replace(/current_task:.*/, 'current_task: null'), 'utf-8');
+
+  const cap = _capture();
+  const p = subcmd.run([], { cwd: root, stdout: cap.stub });
+  assert.equal(p.status, 'clean');
+  assert.ok(Array.isArray(p.pruned_checkpoints));
+  assert.equal(p.pruned_checkpoints[0].task_id, 'M013-S005-T0002');
+  assert.deepEqual(listCheckpoints(root), []);
+});
+
+test('RW-4: malformed checkpoint → checkpoint-schema-mismatch (T-06-12)', () => {
+  const root = makeRoot('M006-S001-T0009');
+  const cpDir = path.join(root, '.nubos-pilot', 'checkpoints');
+  fs.mkdirSync(cpDir, { recursive: true });
+  fs.writeFileSync(path.join(cpDir, 'M006-S001-T0009.json'), JSON.stringify({ schema_version: 99, task_id: 'M006-S001-T0009' }), 'utf-8');
+  const cap = _capture();
+  assert.throws(
+    () => subcmd.run([], { cwd: root, stdout: cap.stub }),
+    (err) => err && err.code === 'checkpoint-schema-mismatch',
+  );
+});

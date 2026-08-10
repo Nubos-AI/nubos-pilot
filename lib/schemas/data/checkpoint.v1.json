@@ -1,0 +1,13 @@
+{
+  "$id": "checkpoint.v1",
+  "title": "Task checkpoint (checkpoints/<task_id>.json)",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "task_id": { "type": "string" },
+    "status": { "type": "string" },
+    "files_touched": { "type": "array" },
+    "nubosloop": { "type": "object" }
+  }
+}

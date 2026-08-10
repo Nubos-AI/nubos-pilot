@@ -1,0 +1,52 @@
+{
+  "name": "nubos-pilot",
+  "version": "1.5.4",
+  "description": "Self-hosted AI pilot for any codebase. Researcher and critic agents plan, execute and verify each change.",
+  "homepage": "https://pilot.nubos.cloud",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nubos-AI/nubos-pilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Nubos-AI/nubos-pilot/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "usearch": "^2.25.1"
+  },
+  "bin": {
+    "nubos-pilot": "bin/install.js"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "templates/",
+    "workflows/",
+    "agents/",
+    "skills/",
+    "np-tools.cjs",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "test": "node --test 'lib/**/*.test.cjs' 'tests/**/*.test.cjs' 'bin/**/*.test.cjs' 'scripts/**/*.test.cjs'",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='lib/**' 'lib/**/*.test.cjs' 'tests/**/*.test.cjs' 'bin/**/*.test.cjs' 'scripts/**/*.test.cjs'",
+    "check-coverage": "node bin/check-coverage.cjs",
+    "docs:generate": "node scripts/generate-docs.cjs",
+    "docs:check": "node scripts/generate-docs.cjs --check",
+    "advisory:build": "node scripts/build-advisory-db.cjs",
+    "advisory:check": "node scripts/build-advisory-db.cjs --check",
+    "attributions": "node scripts/generate-attributions.cjs",
+    "attributions:check": "node scripts/generate-attributions.cjs --check",
+    "ci": "npm run test && npm run check-coverage"
+  }
+}

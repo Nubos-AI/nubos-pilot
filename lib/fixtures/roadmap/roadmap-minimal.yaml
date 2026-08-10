@@ -1,0 +1,40 @@
+schema_version: 1
+milestones:
+  - id: v1.0
+    name: minimal
+    phases:
+      - number: 1
+        name: "Foundation"
+        slug: foundation
+        goal: "Establish the scaffolding so later phases have something to build on."
+        depends_on: "Nothing (first phase)"
+        requirements: [F-01, F-02]
+        success_criteria:
+          - "Scaffolding directory exists with README"
+          - "Initial ADR set is committed"
+        status: done
+        plans:
+          - id: "01-01"
+            title: ""
+            complete: true
+      - number: "2.1"
+        name: "Hotfix"
+        slug: hotfix
+        goal: "Patch the critical issue that blocked Phase 2."
+        depends_on: "Phase 2"
+        requirements: [F-03]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 3
+        name: "Core"
+        slug: core
+        goal: "Build the core library modules that every workflow depends on."
+        depends_on: "Phase 2"
+        requirements: [L-01, L-02, L-03]
+        success_criteria:
+          - "Core parser exports the public surface"
+          - "All unit tests pass with ≥70% coverage"
+          - "Zero runtime dependencies added"
+        status: pending
+        plans: []
