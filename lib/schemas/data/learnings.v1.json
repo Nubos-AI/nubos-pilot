@@ -1,0 +1,28 @@
+{
+  "$id": "learnings.v1",
+  "title": "Learnings store (knowledge/learnings.json)",
+  "type": "object",
+  "required": ["version", "learnings"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "learnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fingerprint", "pattern", "outcome", "occurrence", "first_seen", "last_seen"],
+        "properties": {
+          "fingerprint": { "type": "string", "pattern": "^[a-f0-9]{16}$" },
+          "pattern": { "type": "string", "maxBytes": 4096 },
+          "outcome": { "type": "string", "maxBytes": 4096 },
+          "occurrence": { "type": "integer", "minimum": 1 },
+          "first_seen": { "type": "string" },
+          "last_seen": { "type": "string" },
+          "tokens": { "type": "array", "items": { "type": "string" } },
+          "task_ids": { "type": "array", "items": { "type": "string" } },
+          "milestone_ids": { "type": "array", "items": { "type": "string" } },
+          "outcome_history": { "type": "array" }
+        }
+      }
+    }
+  }
+}

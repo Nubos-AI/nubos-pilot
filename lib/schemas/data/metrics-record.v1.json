@@ -1,0 +1,11 @@
+{
+  "$id": "metrics-record.v1",
+  "title": "Metrics record (metrics/phase-<phase>.jsonl, meta.jsonl line)",
+  "type": "object",
+  "properties": {
+    "duration_ms": { "type": ["number", "null"], "minimum": 0 },
+    "tokens_in": { "type": ["number", "null"] },
+    "tokens_out": { "type": ["number", "null"] },
+    "retry_count": { "type": ["number", "null"], "minimum": 0 }
+  }
+}

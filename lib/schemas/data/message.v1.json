@@ -1,0 +1,19 @@
+{
+  "$id": "message.v1",
+  "title": "Inter-agent message (messages/inbox/<agent>/<id>.json)",
+  "type": "object",
+  "required": ["id", "from", "to", "phase", "kind", "subject", "body", "created_at"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^\\d+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "from": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
+    "to": { "type": "string", "pattern": "^[a-zA-Z0-9_-]+$" },
+    "phase": { "type": "string", "minLength": 1 },
+    "round": { "type": ["integer", "null"], "minimum": 0 },
+    "kind": { "enum": ["request", "response", "notify"] },
+    "subject": { "type": "string", "minLength": 1 },
+    "body": { "type": "string", "maxBytes": 262144 },
+    "expects_reply": { "type": "boolean" },
+    "in_reply_to": { "type": ["string", "null"] },
+    "created_at": { "type": "string" }
+  }
+}

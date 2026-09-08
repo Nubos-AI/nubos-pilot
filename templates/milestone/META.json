@@ -1,0 +1,11 @@
+{
+  "id": "{{milestone_id}}",
+  "name": "{{milestone_name}}",
+  "status": "{{status}}",
+  "created": "{{created_date}}",
+  "goal": "{{goal_text_escaped}}",
+  "requirements": {{requirements_json}},
+  "success_criteria": {{success_criteria_json}},
+  "slice_count": {{slice_count}},
+  "task_count": {{task_count}}
+}

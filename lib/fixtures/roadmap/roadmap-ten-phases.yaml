@@ -1,0 +1,101 @@
+schema_version: 1
+milestones:
+  - id: "1.0"
+    name: "Example"
+    phases:
+      - number: 1
+        name: "Foundation"
+        slug: foundation
+        goal: "Scaffold the project."
+        depends_on: null
+        requirements: [LIB-01]
+        success_criteria: []
+        status: done
+        plans:
+          - id: "01-01"
+            title: ""
+            complete: true
+      - number: 2
+        name: "State"
+        slug: state
+        goal: "Introduce STATE.md and frontmatter."
+        depends_on: "Phase 1"
+        requirements: [LIB-02]
+        success_criteria: []
+        status: pending
+        plans:
+          - id: "02-01"
+            title: ""
+            complete: false
+      - number: 3
+        name: "Library Core"
+        slug: library-core
+        goal: "Land the core library modules."
+        depends_on: "Phase 2"
+        requirements: [LIB-03, LIB-04, LIB-05, LIB-06, LIB-07, LIB-08]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 4
+        name: "Base Workflows"
+        slug: base-workflows
+        goal: "Add the base workflows and state schemas."
+        depends_on: "Phase 3"
+        requirements: [LIB-09]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 5
+        name: "Planning Workflows"
+        slug: planning-workflows
+        goal: "Planner + plan-checker loop."
+        depends_on: "Phase 4"
+        requirements: [LIB-10]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 6
+        name: "Execution"
+        slug: execution
+        goal: "Executor + atomic-commit-per-unit."
+        depends_on: "Phase 5"
+        requirements: [LIB-11]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 7
+        name: "Install"
+        slug: install
+        goal: "Manifest-based installer."
+        depends_on: "Phase 6"
+        requirements: [LIB-12]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 8
+        name: "Runtime Adapters"
+        slug: runtime-adapters
+        goal: "Claude / Codex / Gemini / OpenCode adapters."
+        depends_on: "Phase 7"
+        requirements: [LIB-13]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 9
+        name: "Orchestration"
+        slug: orchestration
+        goal: "Metrics, plan-diff, AI + UI workflows."
+        depends_on: "Phase 8"
+        requirements: [LIB-14]
+        success_criteria: []
+        status: pending
+        plans: []
+      - number: 10
+        name: "Review and Utilities"
+        slug: review-and-utilities
+        goal: "Code-review, eval-review, session-report, cleanup."
+        depends_on: "Phase 9"
+        requirements: [LIB-15]
+        success_criteria: []
+        status: pending
+        plans: []
