@@ -1,0 +1,22 @@
+{
+  "$id": "codebase-manifest.v1",
+  "title": "Codebase hash manifest (codebase/.hashes.json)",
+  "type": "object",
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "generated_at": { "type": ["string", "null"] },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["sha256"],
+        "properties": {
+          "sha256": { "type": "string" },
+          "size": { "type": "integer", "minimum": 0 },
+          "ext": { "type": "string" }
+        }
+      }
+    }
+  }
+}

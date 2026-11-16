@@ -1,0 +1,14 @@
+{
+  "$id": "memory-manifest.v1",
+  "title": "Memory manifest (memory/manifest.json)",
+  "type": "object",
+  "required": ["schema_version", "model", "dim"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "model": { "type": "string", "minLength": 1 },
+    "dim": { "type": "integer", "minimum": 1 },
+    "alpha": { "type": "number" },
+    "created_at": { "type": "string" },
+    "rebuilt_at": { "type": "string" }
+  }
+}

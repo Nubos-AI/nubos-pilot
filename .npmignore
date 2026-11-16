@@ -1,0 +1,8 @@
+**/*.test.cjs
+tests/
+coverage/
+.planning/
+.claude/
+.nubos-pilot/
+CLAUDE.md
+.gitlab-ci.yml

@@ -1,0 +1,16 @@
+{
+  "$id": "memory-record.v1",
+  "title": "Memory record (memory/records.jsonl line)",
+  "type": "object",
+  "required": ["type", "title", "body"],
+  "properties": {
+    "type": { "enum": ["learning", "handoff", "critic", "research"] },
+    "title": { "type": "string", "minLength": 1 },
+    "body": { "type": "string" },
+    "tags": { "type": ["array", "null"] },
+    "provenance": { "enum": ["VERIFIED", "CITED", "ASSUMED", "CACHED", null] },
+    "id": { "type": ["string", "null"] },
+    "phase": { "type": ["string", "null"] },
+    "created_at": { "type": ["string", "null"] }
+  }
+}

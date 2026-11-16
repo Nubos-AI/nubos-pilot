@@ -1,0 +1,16 @@
+{
+  "$id": "elision-entry.v1",
+  "title": "Elision cache entry (.nubos-pilot/elision/<hash>.json)",
+  "type": "object",
+  "required": ["version", "hash", "original", "type", "created_at", "ttl_ms", "original_bytes", "compressed_bytes"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 1 },
+    "hash": { "type": "string", "pattern": "^[a-f0-9]{12}$" },
+    "original": { "type": "string", "maxBytes": 8388608 },
+    "type": { "type": "string", "maxBytes": 64 },
+    "created_at": { "type": "string" },
+    "ttl_ms": { "type": "integer", "minimum": 0 },
+    "original_bytes": { "type": "integer", "minimum": 0 },
+    "compressed_bytes": { "type": "integer", "minimum": 0 }
+  }
+}
